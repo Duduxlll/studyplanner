@@ -13,7 +13,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
 
   useEffect(() => {
-    const stored = (localStorage.getItem('theme') as Theme) ?? 'dark';
+    const stored = (localStorage.getItem('sp-theme') as Theme) ?? 'dark';
     setTheme(stored);
     document.documentElement.setAttribute('data-theme', stored);
   }, []);
@@ -21,8 +21,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   function toggle() {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
-    localStorage.setItem('theme', next);
+    localStorage.setItem('sp-theme', next);
     document.documentElement.setAttribute('data-theme', next);
+    // Persiste no banco (best-effort)
+    fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: next }),
+    }).catch(() => {});
   }
 
   return (

@@ -1,105 +1,135 @@
 @import "tailwindcss";
 
-:root {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-border: rgba(255,255,255,0.06);
-  --muted: #3f3f46;
-  --muted-fg: #a1a1aa;
+/* ── Variáveis de tema ── */
+:root,
+[data-theme="dark"] {
+  --bg: #09090b;
+  --bg-card: #18181b;
+  --bg-card2: rgba(24,24,27,0.7);
+  --bg-input: rgba(39,39,42,0.8);
+  --border: rgba(255,255,255,0.07);
+  --border-input: #3f3f46;
+  --text: #fafafa;
+  --text-muted: #a1a1aa;
+  --text-faint: #52525b;
+  --scrollbar: #3f3f46;
+
+  color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --background: #f4f4f5;
-  --foreground: #09090b;
-  --card: #ffffff;
-  --card-border: rgba(0,0,0,0.08);
-  --muted: #e4e4e7;
-  --muted-fg: #71717a;
+  --bg: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card2: rgba(255,255,255,0.85);
+  --bg-input: #f8fafc;
+  --border: rgba(0,0,0,0.09);
+  --border-input: #cbd5e1;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-faint: #94a3b8;
+  --scrollbar: #cbd5e1;
+
+  color-scheme: light;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  transition: background 0.3s, color 0.3s;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-150%); }
-  100% { transform: translateX(250%); }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.animate-shimmer {
-  animation: shimmer 2.5s ease-in-out infinite;
-}
-
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-.animate-glow-pulse {
-  animation: glow-pulse 2.5s ease-in-out infinite;
-}
-
-.animate-slide-up {
-  animation: slide-up 0.4s ease-out both;
-}
-
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out both;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #7c3aed;
-}
-
+/* ── Base ── */
 html {
   scroll-behavior: smooth;
 }
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+* { box-sizing: border-box; }
+
+/* ── Override Tailwind hardcoded: faz zinc-950/900/800 respeitarem o tema ── */
+[data-theme="light"] .bg-zinc-950,
+[data-theme="light"] main.min-h-screen {
+  background-color: var(--bg) !important;
+}
+[data-theme="light"] .bg-zinc-900\/50,
+[data-theme="light"] .bg-zinc-900\/60,
+[data-theme="light"] .bg-zinc-900\/70,
+[data-theme="light"] .bg-zinc-900\/80 {
+  background-color: var(--bg-card) !important;
+}
+[data-theme="light"] .bg-zinc-800\/80,
+[data-theme="light"] .bg-zinc-800\/60,
+[data-theme="light"] .bg-zinc-800 {
+  background-color: var(--bg-input) !important;
+}
+[data-theme="light"] .border-zinc-700\/40,
+[data-theme="light"] .border-zinc-700\/50,
+[data-theme="light"] .border-zinc-700 {
+  border-color: var(--border) !important;
+}
+[data-theme="light"] .text-zinc-400 { color: var(--text-muted) !important; }
+[data-theme="light"] .text-zinc-500 { color: var(--text-muted) !important; }
+[data-theme="light"] .text-zinc-600 { color: var(--text-faint) !important; }
+[data-theme="light"] .text-zinc-100,
+[data-theme="light"] .text-white    { color: var(--text) !important; }
+[data-theme="light"] .text-zinc-300 { color: #334155 !important; }
+
+/* sticky headers no modo claro */
+[data-theme="light"] header,
+[data-theme="light"] .backdrop-blur-xl {
+  background-color: rgba(241,245,249,0.85) !important;
+  border-bottom-color: rgba(0,0,0,0.08) !important;
+}
+
+/* inputs no modo claro */
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: var(--bg-input) !important;
+  border-color: var(--border-input) !important;
+  color: var(--text) !important;
+}
+
+/* blobs de fundo — bem mais suaves no claro */
+[data-theme="light"] .fixed.inset-0 > div {
+  opacity: 0.3;
+}
+
+/* ── Animações ── */
+@keyframes shimmer {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(250%); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-shimmer   { animation: shimmer   2.5s ease-in-out infinite; }
+.animate-float     { animation: float     3s   ease-in-out infinite; }
+.animate-glow-pulse{ animation: glow-pulse 2.5s ease-in-out infinite; }
+.animate-slide-up  { animation: slide-up  0.4s ease-out both; }
+.animate-fade-in   { animation: fade-in   0.3s ease-out both; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #7c3aed; }

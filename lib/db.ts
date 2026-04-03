@@ -121,6 +121,12 @@ async function runMigrations(db: Client): Promise<void> {
   if (!usCols.includes('avatar_url')) {
     await db.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''");
   }
+  if (!usCols.includes('banner_url')) {
+    await db.execute("ALTER TABLE users ADD COLUMN banner_url TEXT DEFAULT ''");
+  }
+  if (!usCols.includes('theme')) {
+    await db.execute("ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'dark'");
+  }
 
   const pvInfo = await db.execute('PRAGMA table_info(plan_videos)');
   const pvCols = pvInfo.rows.map((r) => String(r.name));
