@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { useTheme } from '@/components/ThemeProvider';
+import { useAvatar } from '@/components/AvatarProvider';
 
 interface ProfileData {
   user: {
@@ -50,6 +51,7 @@ function resizeImage(file: File, maxPx: number): Promise<string> {
 export default function ProfilePage() {
   const { data: session } = useSession();
   const { theme, toggle } = useTheme();
+  const { setAvatarUrl: setGlobalAvatar } = useAvatar();
   const { toast, show } = useToast();
 
   const [data, setData] = useState<ProfileData | null>(null);
@@ -117,6 +119,8 @@ export default function ProfilePage() {
       if (!res.ok) { const j = await res.json(); show(j.error ?? 'Erro ao salvar imagem.', false); return; }
       setPreview(base64);
       setData(prev => prev ? { ...prev, user: { ...prev.user, [field]: base64 } } : prev);
+      // Propaga o novo avatar para o header da página principal
+      if (field === 'avatar_url') setGlobalAvatar(base64);
       show(field === 'avatar_url' ? 'Foto atualizada!' : 'Banner atualizado!', true);
     } catch {
       show('Erro ao processar imagem.', false);
@@ -235,8 +239,8 @@ export default function ProfilePage() {
               {/* Avatar */}
               <div className="relative group">
                 {avatarPreview
-                  ? <img src={avatarPreview} alt="" className="w-20 h-20 rounded-2xl border-4 border-zinc-900 object-cover shadow-[0_0_30px_rgba(139,92,246,0.3)]" />
-                  : <div className="w-20 h-20 rounded-2xl border-4 border-zinc-900 bg-gradient-to-br from-violet-600 to-violet-800 flex items-center justify-center text-3xl font-bold text-white shadow-[0_0_30px_rgba(139,92,246,0.3)]">
+                  ? <img src={avatarPreview} alt="" className="w-20 h-20 rounded-2xl border-4 border-zinc-900 object-cover" />
+                  : <div className="w-20 h-20 rounded-2xl border-4 border-zinc-900 bg-gradient-to-br from-violet-600 to-violet-800 flex items-center justify-center text-3xl font-bold text-white">
                       {initials}
                     </div>
                 }

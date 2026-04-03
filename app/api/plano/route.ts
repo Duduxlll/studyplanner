@@ -219,10 +219,17 @@ Retorne SOMENTE um JSON válido, sem markdown:
 
     let planData: { days: PlanDay[] };
     try {
-      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      // Remove blocos de código markdown se existirem
+      let cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      // Extrai o primeiro objeto JSON encontrado (caso a IA coloque texto antes/depois)
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) cleaned = jsonMatch[0];
       planData = JSON.parse(cleaned);
-    } catch {
-      console.error('[Claude] JSON inválido:', raw.slice(0, 500));
+      if (!planData?.days || !Array.isArray(planData.days)) {
+        throw new Error('Estrutura inválida: campo "days" ausente');
+      }
+    } catch (err) {
+      console.error('[Claude] JSON inválido:', String(err), '\nResposta:', raw.slice(0, 800));
       return NextResponse.json({ error: 'A IA retornou um formato inválido. Tente novamente.' }, { status: 500 });
     }
 

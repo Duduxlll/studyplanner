@@ -7,6 +7,7 @@ import AddChannelModal from '@/components/AddChannelModal';
 import PlanCreator from '@/components/PlanCreator';
 import Link from 'next/link';
 import { useTheme } from '@/components/ThemeProvider';
+import { useAvatar } from '@/components/AvatarProvider';
 
 interface Channel {
   id: number;
@@ -154,6 +155,7 @@ function LandingPage() {
 export default function Home() {
   const { data: session, status } = useSession();
   const { theme, toggle } = useTheme();
+  const { avatarUrl, setAvatarUrl } = useAvatar();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -175,6 +177,14 @@ export default function Home() {
     if (status === 'authenticated') {
       loadChannels();
       loadPlans();
+      // Carrega avatar salvo no banco (pode ser diferente da foto do Google)
+      fetch('/api/profile')
+        .then(r => r.json())
+        .then(d => {
+          const url = d.user?.avatar_url || d.googleImage || '';
+          if (url) setAvatarUrl(url);
+        })
+        .catch(() => {});
     }
   }, [status]);
 
@@ -288,8 +298,8 @@ export default function Home() {
             {session?.user && (
               <div className="flex items-center gap-2 pl-2 border-l border-zinc-800">
                 <Link href="/profile" className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-                  {session.user.image ? (
-                    <img src={session.user.image} alt="" className="w-7 h-7 rounded-full border border-zinc-700" />
+                  {(avatarUrl || session.user.image) ? (
+                    <img src={avatarUrl || session.user.image!} alt="" className="w-7 h-7 rounded-full border border-zinc-700 object-cover" />
                   ) : (
                     <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center text-xs font-bold text-white">
                       {session.user.name?.[0]?.toUpperCase() ?? '?'}
