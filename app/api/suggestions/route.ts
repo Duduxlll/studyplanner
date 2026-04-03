@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import getDb from '@/lib/db';
+import { ensureInit } from '@/lib/db';
+import { auth } from '@/auth';
 import { resolveChannel } from '@/lib/youtube';
 
 export const runtime = 'nodejs';
@@ -8,15 +9,20 @@ export const runtime = 'nodejs';
 const client = new Anthropic();
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
   try {
     const topicsParam = req.nextUrl.searchParams.get('topics') ?? '';
     const topics = topicsParam ? topicsParam.split(',').map((t) => t.trim()) : ['programação', 'tecnologia'];
 
-    const db = getDb();
-    const existingChannels = db.prepare('SELECT name FROM channels').all() as { name: string }[];
-    const existingNames = existingChannels.map((c) => c.name);
+    const db = await ensureInit();
+    const existingResult = await db.execute({
+      sql: 'SELECT name FROM channels WHERE user_id = ?',
+      args: [session.user.id],
+    });
+    const existingNames = (existingResult.rows as unknown as { name: string }[]).map((c) => c.name);
 
-    // Claude sugere nomes de canais brasileiros
     const prompt = `Você é um especialista em canais brasileiros do YouTube sobre tecnologia.
 
 Sugira 6 canais brasileiros do YouTube (em português) sobre os tópicos: ${topics.join(', ')}.
@@ -44,7 +50,6 @@ Retorne SOMENTE um JSON válido, sem markdown:
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const suggestions = (JSON.parse(cleaned).channels ?? []) as { name: string; description: string }[];
 
-    // Busca todos os canais no YouTube EM PARALELO (muito mais rápido)
     const results = await Promise.allSettled(
       suggestions.slice(0, 6).map(async (s) => {
         const info = await resolveChannel(s.name);
