@@ -112,6 +112,16 @@ async function runInit(db: Client): Promise<void> {
 }
 
 async function runMigrations(db: Client): Promise<void> {
+  // users: bio e avatar_url
+  const usInfo = await db.execute('PRAGMA table_info(users)');
+  const usCols = usInfo.rows.map((r) => String(r.name));
+  if (!usCols.includes('bio')) {
+    await db.execute("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''");
+  }
+  if (!usCols.includes('avatar_url')) {
+    await db.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''");
+  }
+
   const pvInfo = await db.execute('PRAGMA table_info(plan_videos)');
   const pvCols = pvInfo.rows.map((r) => String(r.name));
   if (!pvCols.includes('notes')) {

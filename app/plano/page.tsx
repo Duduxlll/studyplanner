@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import PlanDayCard from '@/components/PlanDayCard';
+import MindMapModal from '@/components/MindMapModal';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -40,6 +41,7 @@ function PlanoContent() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [selectedDay, setSelectedDay] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [mindMap, setMindMap] = useState<{ day?: number } | null>(null);
 
   useEffect(() => {
     if (!planId) {
@@ -172,6 +174,22 @@ function PlanoContent() {
       </header>
 
       <div className="max-w-4xl mx-auto px-6 py-6 flex flex-col gap-6 relative">
+        {/* Botões de mapa mental */}
+        <div className="flex gap-2 flex-wrap animate-slide-up">
+          <button
+            onClick={() => setMindMap({ day: selectedDay })}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-600/15 hover:bg-violet-600/25 border border-violet-500/30 hover:border-violet-500/50 text-violet-400 text-xs font-semibold rounded-xl transition-all"
+          >
+            🗺️ Mapa do Dia {selectedDay}
+          </button>
+          <button
+            onClick={() => setMindMap({})}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 hover:border-zinc-600 text-zinc-400 text-xs font-semibold rounded-xl transition-all"
+          >
+            🗺️ Mapa Completo
+          </button>
+        </div>
+
         {/* Seletor de dias */}
         <div className="flex gap-2 flex-wrap animate-slide-up">
           {days.map((day) => {
@@ -219,6 +237,15 @@ function PlanoContent() {
           </div>
         )}
       </div>
+
+      {mindMap !== null && plan && (
+        <MindMapModal
+          planId={plan.id}
+          planTitle={plan.title}
+          day={mindMap.day}
+          onClose={() => setMindMap(null)}
+        />
+      )}
     </main>
   );
 }
