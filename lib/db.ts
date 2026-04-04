@@ -74,6 +74,7 @@ async function runInit(db: Client): Promise<void> {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS channel_videos_cache (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL DEFAULT '',
       channel_id TEXT NOT NULL,
       video_id TEXT NOT NULL,
       title TEXT NOT NULL,
@@ -82,7 +83,7 @@ async function runInit(db: Client): Promise<void> {
       duration_minutes INTEGER NOT NULL,
       thumbnail TEXT,
       fetched_at TEXT DEFAULT (datetime('now')),
-      UNIQUE(channel_id, video_id)
+      UNIQUE(user_id, channel_id, video_id)
     )
   `);
 
@@ -150,5 +151,27 @@ async function runMigrations(db: Client): Promise<void> {
   const plCols = plInfo.rows.map((r) => String(r.name));
   if (!plCols.includes('user_id')) {
     await db.execute("ALTER TABLE plans ADD COLUMN user_id TEXT NOT NULL DEFAULT ''");
+  }
+
+  // Migração do cache de vídeos: adicionar user_id se não existir (recria a tabela)
+  const cacheInfo = await db.execute('PRAGMA table_info(channel_videos_cache)');
+  const cacheCols = cacheInfo.rows.map((r) => String(r.name));
+  if (!cacheCols.includes('user_id')) {
+    await db.execute('DROP TABLE channel_videos_cache');
+    await db.execute(`
+      CREATE TABLE channel_videos_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL DEFAULT '',
+        channel_id TEXT NOT NULL,
+        video_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        url TEXT NOT NULL,
+        channel_name TEXT NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        thumbnail TEXT,
+        fetched_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(user_id, channel_id, video_id)
+      )
+    `);
   }
 }

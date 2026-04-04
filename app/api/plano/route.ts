@@ -6,6 +6,7 @@ import { getAllChannelVideos, getPlaylistVideos, filterVideosByTopics, VideoInfo
 import type { Client } from '@libsql/client';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const client = new Anthropic();
 const CACHE_DAYS = 7;
@@ -28,15 +29,16 @@ interface PlanDay {
 async function getVideosWithCache(
   channelId: string,
   isPlaylist: boolean,
+  userId: string,
   db: Client
 ): Promise<{ videos: VideoInfo[]; fromCache: boolean }> {
   const cached = await db.execute({
     sql: `SELECT video_id as videoId, title, url, channel_name as channelName,
                  duration_minutes as durationMinutes, thumbnail
           FROM channel_videos_cache
-          WHERE channel_id = ?
+          WHERE user_id = ? AND channel_id = ?
           AND fetched_at > datetime('now', '-${CACHE_DAYS} days')`,
-    args: [channelId],
+    args: [userId, channelId],
   });
 
   if (cached.rows.length > 0) {
@@ -52,9 +54,9 @@ async function getVideosWithCache(
     await db.batch(
       videos.map((v) => ({
         sql: `INSERT OR REPLACE INTO channel_videos_cache
-              (channel_id, video_id, title, url, channel_name, duration_minutes, thumbnail, fetched_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        args: [channelId, v.videoId, v.title, v.url, v.channelName, v.durationMinutes, v.thumbnail ?? null],
+              (user_id, channel_id, video_id, title, url, channel_name, duration_minutes, thumbnail, fetched_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+        args: [userId, channelId, v.videoId, v.title, v.url, v.channelName, v.durationMinutes, v.thumbnail ?? null],
       })),
       'write'
     );
@@ -62,6 +64,89 @@ async function getVideosWithCache(
 
   console.log(`[Cache] ${videos.length} vídeos para ${channelId} buscados e salvos.`);
   return { videos, fromCache: false };
+}
+
+function buildPrompt(
+  videoList: string,
+  dayStart: number,
+  dayEnd: number,
+  totalDays: number,
+  hoursPerDay: number,
+  topics: string[],
+  instructions: string | undefined,
+  minPorDia: number,
+  maxPorDia: number
+): string {
+  return `Você é um curador especialista em trilhas de aprendizado. Tenho os seguintes vídeos disponíveis do YouTube (todos em português brasileiro):
+
+${videoList}
+
+Crie os DIAS ${dayStart} até ${dayEnd} (de uma trilha total de ${totalDays} dias) com ${hoursPerDay} hora(s) de estudo por dia.
+Tópicos: ${topics.join(', ')}.
+${instructions ? `\nINSTRUÇÕES ESPECIAIS DO USUÁRIO (siga com prioridade):\n${instructions}\n` : ''}
+REGRAS OBRIGATÓRIAS DE TEMPO (CRÍTICO — não ignore):
+- O total de minutos de cada dia deve ser entre ${minPorDia} e ${maxPorDia} minutos — NUNCA menos, NUNCA mais
+- Some as durações EXATAS dos vídeos e verifique antes de fechar o dia
+- Se um vídeo novo fizer ultrapassar ${maxPorDia} min, NÃO o inclua e encerre o dia
+- NENHUM vídeo individual pode ter duração maior que ${maxPorDia} minutos
+
+REGRAS DE PROGRESSÃO (muito importante):
+- A trilha total de ${totalDays} dias segue do INICIANTE ao AVANÇADO
+- Dias 1 até ${Math.ceil(totalDays * 0.3)}: conceitos fundamentais e introdutórios
+- Dias ${Math.ceil(totalDays * 0.3) + 1} até ${Math.ceil(totalDays * 0.7)}: conceitos intermediários, aprofundamento
+- Dias ${Math.ceil(totalDays * 0.7) + 1} até ${totalDays}: conceitos avançados, projetos, especialização
+- Você está gerando os dias ${dayStart} a ${dayEnd}, respeite o nível de progressão correspondente
+- Cada dia deve ter um TEMA COERENTE (ex: "Introdução a Cloud", "Docker na prática")
+- Os vídeos de um mesmo dia devem se COMPLEMENTAR
+- NÃO misture básico e avançado no mesmo dia
+
+OUTRAS REGRAS:
+- NUNCA repita o mesmo vídeo em dias diferentes
+- Use APENAS vídeos da lista acima com as URLs EXATAS
+- Se não houver vídeos suficientes, crie menos dias (não invente vídeos)
+- Descrição: 1 frase explicando o que o aluno aprende
+- O campo "day" de cada dia deve começar em ${dayStart} e ir até no máximo ${dayEnd}
+
+Retorne SOMENTE um JSON válido, sem markdown:
+{
+  "days": [
+    {
+      "day": ${dayStart},
+      "theme": "Tema do dia",
+      "videos": [
+        {
+          "title": "título exato do vídeo",
+          "url": "https://www.youtube.com/watch?v=...",
+          "channel": "nome do canal",
+          "duration_minutes": 30,
+          "description": "O que você aprende neste vídeo.",
+          "level": "básico"
+        }
+      ]
+    }
+  ]
+}`;
+}
+
+async function callClaude(prompt: string): Promise<PlanDay[]> {
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 32000,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+
+  let cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) cleaned = jsonMatch[0];
+
+  const parsed = JSON.parse(cleaned);
+  if (!parsed?.days || !Array.isArray(parsed.days)) {
+    throw new Error('Estrutura inválida: campo "days" ausente');
+  }
+
+  return parsed.days as PlanDay[];
 }
 
 export async function POST(req: NextRequest) {
@@ -113,7 +198,7 @@ export async function POST(req: NextRequest) {
 
     for (const ch of channels) {
       try {
-        const { videos } = await getVideosWithCache(ch.channel_id, ch.is_playlist === 1, db);
+        const { videos } = await getVideosWithCache(ch.channel_id, ch.is_playlist === 1, userId, db);
         allVideos.push(...videos);
       } catch (ytErr: unknown) {
         const msg = String(ytErr);
@@ -157,80 +242,65 @@ export async function POST(req: NextRequest) {
       }, { status: 404 });
     }
 
-    const videoList = videosValidos.slice(0, 150).map((v, i) =>
-      `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
-    ).join('\n');
+    let allDays: PlanDay[] = [];
 
-    const prompt = `Você é um curador especialista em trilhas de aprendizado. Tenho os seguintes vídeos disponíveis do YouTube (todos em português brasileiro):
+    if (total_days <= 12) {
+      // Chamada única para planos curtos
+      const videoList = videosValidos.slice(0, 150).map((v, i) =>
+        `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
+      ).join('\n');
 
-${videoList}
+      const prompt = buildPrompt(videoList, 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia);
 
-Crie uma TRILHA DE APRENDIZADO de ${total_days} dias com ${hours_per_day} hora(s) de estudo por dia.
-Tópicos: ${topics.join(', ')}.
-${instructions ? `\nINSTRUÇÕES ESPECIAIS DO USUÁRIO (siga com prioridade):\n${instructions}\n` : ''}
-REGRAS OBRIGATÓRIAS DE TEMPO (CRÍTICO — não ignore):
-- O total de minutos de cada dia deve ser entre ${minPorDia} e ${maxPorDia} minutos — NUNCA menos, NUNCA mais
-- Some as durações EXATAS dos vídeos e verifique antes de fechar o dia
-- Se um vídeo novo fizer ultrapassar ${maxPorDia} min, NÃO o inclua e encerre o dia
-- NENHUM vídeo individual pode ter duração maior que ${maxPorDia} minutos
-
-REGRAS DE PROGRESSÃO (muito importante):
-- A trilha deve seguir uma linha de aprendizado contínua do INICIANTE ao AVANÇADO
-- Dia 1 a ~${Math.ceil(total_days * 0.3)}: conceitos fundamentais e introdutórios
-- Dia ${Math.ceil(total_days * 0.3) + 1} a ~${Math.ceil(total_days * 0.7)}: conceitos intermediários, aprofundamento
-- Dia ${Math.ceil(total_days * 0.7) + 1} a ${total_days}: conceitos avançados, projetos, especialização
-- Cada dia deve ter um TEMA COERENTE (ex: "Introdução a Cloud", "Docker na prática")
-- Os vídeos de um mesmo dia devem se COMPLEMENTAR
-- NÃO misture básico e avançado no mesmo dia
-
-OUTRAS REGRAS:
-- NUNCA repita o mesmo vídeo em dias diferentes
-- Use APENAS vídeos da lista acima com as URLs EXATAS
-- Se não houver vídeos suficientes, crie menos dias (não invente vídeos)
-- Descrição: 1 frase explicando o que o aluno aprende
-
-Retorne SOMENTE um JSON válido, sem markdown:
-{
-  "days": [
-    {
-      "day": 1,
-      "theme": "Tema do dia",
-      "videos": [
-        {
-          "title": "título exato do vídeo",
-          "url": "https://www.youtube.com/watch?v=...",
-          "channel": "nome do canal",
-          "duration_minutes": 30,
-          "description": "O que você aprende neste vídeo.",
-          "level": "básico"
-        }
-      ]
-    }
-  ]
-}`;
-
-    const message = await client.messages.create({
-      model: 'claude-opus-4-6',
-      max_tokens: 16000,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const raw = message.content[0].type === 'text' ? message.content[0].text : '';
-
-    let planData: { days: PlanDay[] };
-    try {
-      // Remove blocos de código markdown se existirem
-      let cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      // Extrai o primeiro objeto JSON encontrado (caso a IA coloque texto antes/depois)
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) cleaned = jsonMatch[0];
-      planData = JSON.parse(cleaned);
-      if (!planData?.days || !Array.isArray(planData.days)) {
-        throw new Error('Estrutura inválida: campo "days" ausente');
+      try {
+        allDays = await callClaude(prompt);
+      } catch (err) {
+        console.error('[Claude] Erro na geração (único):', String(err));
+        return NextResponse.json({ error: 'A IA retornou um formato inválido. Tente novamente.' }, { status: 500 });
       }
-    } catch (err) {
-      console.error('[Claude] JSON inválido:', String(err), '\nResposta:', raw.slice(0, 800));
-      return NextResponse.json({ error: 'A IA retornou um formato inválido. Tente novamente.' }, { status: 500 });
+    } else {
+      // Batching em 2 chamadas para planos longos
+      const midDay = Math.ceil(total_days / 2);
+
+      // Lote 1: dias 1 até midDay
+      const videoList1 = videosValidos.slice(0, 150).map((v, i) =>
+        `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
+      ).join('\n');
+
+      const prompt1 = buildPrompt(videoList1, 1, midDay, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia);
+
+      let days1: PlanDay[];
+      try {
+        days1 = await callClaude(prompt1);
+        console.log(`[Plano] Lote 1 gerado: ${days1.length} dias.`);
+      } catch (err) {
+        console.error('[Claude] Erro no lote 1:', String(err));
+        return NextResponse.json({ error: 'A IA retornou um formato inválido no lote 1. Tente novamente.' }, { status: 500 });
+      }
+
+      // Filtra vídeos usados no lote 1
+      const usedInBatch1 = new Set<string>(days1.flatMap((d) => d.videos.map((v) => v.url)));
+      const videosParaLote2 = videosValidos.filter((v) => !usedInBatch1.has(v.url));
+
+      let days2: PlanDay[] = [];
+      if (videosParaLote2.length > 0) {
+        const videoList2 = videosParaLote2.slice(0, 150).map((v, i) =>
+          `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
+        ).join('\n');
+
+        const prompt2 = buildPrompt(videoList2, midDay + 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia);
+
+        try {
+          days2 = await callClaude(prompt2);
+          console.log(`[Plano] Lote 2 gerado: ${days2.length} dias.`);
+        } catch (err) {
+          console.error('[Claude] Erro no lote 2 (usando apenas lote 1):', String(err));
+        }
+      } else {
+        console.log('[Plano] Sem vídeos suficientes para lote 2.');
+      }
+
+      allDays = [...days1, ...days2];
     }
 
     // Salva o plano
@@ -248,7 +318,7 @@ Retorne SOMENTE um JSON válido, sem markdown:
     const planId = Number(planResult.lastInsertRowid);
 
     const videoStmts: { sql: string; args: (string | number | null)[] }[] = [];
-    for (const day of planData.days) {
+    for (const day of allDays) {
       day.videos.forEach((video, idx) => {
         videoStmts.push({
           sql: `INSERT INTO plan_videos (plan_id, day, day_theme, title, youtube_url, duration_minutes, description, channel_name, level, order_in_day)
@@ -262,8 +332,8 @@ Retorne SOMENTE um JSON válido, sem markdown:
       await db.batch(videoStmts, 'write');
     }
 
-    console.log(`[Plano] Plano ${planId} salvo para user ${userId}.`);
-    return NextResponse.json({ planId, totalDays: planData.days.length }, { status: 201 });
+    console.log(`[Plano] Plano ${planId} salvo para user ${userId}. Total: ${allDays.length} dias.`);
+    return NextResponse.json({ planId, totalDays: allDays.length }, { status: 201 });
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

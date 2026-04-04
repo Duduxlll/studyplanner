@@ -8,6 +8,7 @@ import PlanCreator from '@/components/PlanCreator';
 import Link from 'next/link';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAvatar } from '@/components/AvatarProvider';
+import { upsertSavedAccount } from '@/lib/saved-accounts';
 
 interface Channel {
   id: number;
@@ -183,6 +184,15 @@ export default function Home() {
         .then(d => {
           const url = d.user?.avatar_url || d.googleImage || '';
           if (url) setAvatarUrl(url);
+          // Atualiza conta salva com nome e avatar reais (captura Google também)
+          if (session?.user?.email) {
+            upsertSavedAccount({
+              email: session.user.email,
+              name: d.user?.name || session.user.name || '',
+              avatarUrl: url,
+              provider: session.user.image && !d.user?.avatar_url ? 'google' : 'credentials',
+            });
+          }
         })
         .catch(() => {});
     }
