@@ -131,9 +131,14 @@ Retorne SOMENTE um JSON válido, sem markdown:
 async function callClaude(prompt: string): Promise<PlanDay[]> {
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 32000,
+    max_tokens: 16000,
     messages: [{ role: 'user', content: prompt }],
   });
+
+  if (message.stop_reason === 'max_tokens') {
+    console.error('[Claude] Resposta truncada (max_tokens atingido).');
+    throw new Error('Resposta truncada: aumente as horas/dia ou reduza os dias para gerar um plano menor.');
+  }
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : '';
 
@@ -141,12 +146,17 @@ async function callClaude(prompt: string): Promise<PlanDay[]> {
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
   if (jsonMatch) cleaned = jsonMatch[0];
 
-  const parsed = JSON.parse(cleaned);
-  if (!parsed?.days || !Array.isArray(parsed.days)) {
-    throw new Error('Estrutura inválida: campo "days" ausente');
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (!parsed?.days || !Array.isArray(parsed.days)) {
+      throw new Error('Campo "days" ausente ou inválido');
+    }
+    return parsed.days as PlanDay[];
+  } catch (parseErr) {
+    console.error('[Claude] Falha ao parsear JSON. Stop reason:', message.stop_reason);
+    console.error('[Claude] Início da resposta:', raw.slice(0, 500));
+    throw parseErr;
   }
-
-  return parsed.days as PlanDay[];
 }
 
 export async function POST(req: NextRequest) {
@@ -242,40 +252,52 @@ export async function POST(req: NextRequest) {
       }, { status: 404 });
     }
 
+    // Calcula quantos vídeos enviar por chamada com base nos parâmetros do plano
+    // Estimativa: (horas/dia × 60 / duração média de 40min) × dias × 1.5 de folga, máx 200
+    function videosNeeded(days: number) {
+      return Math.min(200, Math.ceil((hours_per_day * 60) / 40) * days * 2);
+    }
+
+    function toList(videos: VideoInfo[], limit: number) {
+      return videos.slice(0, limit).map((v, i) =>
+        `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
+      ).join('\n');
+    }
+
     let allDays: PlanDay[] = [];
 
     if (total_days <= 12) {
       // Chamada única para planos curtos
-      const videoList = videosValidos.slice(0, 150).map((v, i) =>
-        `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
-      ).join('\n');
-
-      const prompt = buildPrompt(videoList, 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia);
+      const prompt = buildPrompt(
+        toList(videosValidos, videosNeeded(total_days)),
+        1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
+      );
 
       try {
         allDays = await callClaude(prompt);
       } catch (err) {
-        console.error('[Claude] Erro na geração (único):', String(err));
-        return NextResponse.json({ error: 'A IA retornou um formato inválido. Tente novamente.' }, { status: 500 });
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[Claude] Erro na geração (único):', msg);
+        return NextResponse.json({ error: `Erro ao gerar plano: ${msg}` }, { status: 500 });
       }
     } else {
       // Batching em 2 chamadas para planos longos
       const midDay = Math.ceil(total_days / 2);
 
       // Lote 1: dias 1 até midDay
-      const videoList1 = videosValidos.slice(0, 150).map((v, i) =>
-        `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
-      ).join('\n');
-
-      const prompt1 = buildPrompt(videoList1, 1, midDay, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia);
+      const prompt1 = buildPrompt(
+        toList(videosValidos, videosNeeded(midDay)),
+        1, midDay, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
+      );
 
       let days1: PlanDay[];
       try {
         days1 = await callClaude(prompt1);
         console.log(`[Plano] Lote 1 gerado: ${days1.length} dias.`);
       } catch (err) {
-        console.error('[Claude] Erro no lote 1:', String(err));
-        return NextResponse.json({ error: 'A IA retornou um formato inválido no lote 1. Tente novamente.' }, { status: 500 });
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[Claude] Erro no lote 1:', msg);
+        return NextResponse.json({ error: `Erro no lote 1: ${msg}` }, { status: 500 });
       }
 
       // Filtra vídeos usados no lote 1
@@ -284,17 +306,17 @@ export async function POST(req: NextRequest) {
 
       let days2: PlanDay[] = [];
       if (videosParaLote2.length > 0) {
-        const videoList2 = videosParaLote2.slice(0, 150).map((v, i) =>
-          `${i + 1}. "${v.title}" | Canal: ${v.channelName} | Duração: ${v.durationMinutes} min | URL: ${v.url}`
-        ).join('\n');
-
-        const prompt2 = buildPrompt(videoList2, midDay + 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia);
+        const daysLote2 = total_days - midDay;
+        const prompt2 = buildPrompt(
+          toList(videosParaLote2, videosNeeded(daysLote2)),
+          midDay + 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
+        );
 
         try {
           days2 = await callClaude(prompt2);
           console.log(`[Plano] Lote 2 gerado: ${days2.length} dias.`);
         } catch (err) {
-          console.error('[Claude] Erro no lote 2 (usando apenas lote 1):', String(err));
+          console.error('[Claude] Erro no lote 2 (usando apenas lote 1):', err instanceof Error ? err.message : String(err));
         }
       } else {
         console.log('[Plano] Sem vídeos suficientes para lote 2.');
