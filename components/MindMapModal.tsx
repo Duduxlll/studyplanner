@@ -295,7 +295,7 @@ export default function MindMapModal({ planId, planTitle, day, onClose }: Props)
               </div>
               <div className="text-center">
                 <p className="text-zinc-200 text-sm font-medium">Gerando mapa mental...</p>
-                <p className="text-zinc-600 text-xs mt-1">A IA está organizando os conceitos</p>
+                <p className="text-zinc-600 text-xs mt-1">Organizando os conceitos...</p>
               </div>
             </div>
           )}
@@ -339,7 +339,7 @@ export default function MindMapModal({ planId, planTitle, day, onClose }: Props)
 
         {placed && (
           <div className="px-6 py-2.5 border-t border-zinc-800/60 flex items-center justify-between">
-            <p className="text-xs text-zinc-700">Mapa gerado por IA · {allNodes.length} conceitos</p>
+            <p className="text-xs text-zinc-700">{allNodes.length} conceitos</p>
             <div className="flex items-center gap-2">
               {[...new Set(allNodes.filter(n => n.level === 1).map(n => n.stroke))].slice(0, 6).map((c, i) => (
                 <span key={i} className="w-2 h-2 rounded-full" style={{ backgroundColor: c }} />

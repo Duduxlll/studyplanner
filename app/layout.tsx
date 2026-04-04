@@ -9,8 +9,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "StudyPlanner — Seu plano de estudos com IA",
-  description: "Crie planos de estudos personalizados com canais do YouTube e IA",
+  title: "StudyPlanner — Seu plano de estudos personalizado",
+  description: "Transforme canais do YouTube em planos de estudo organizados, com progresso e mapas mentais.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

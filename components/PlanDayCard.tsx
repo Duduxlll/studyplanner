@@ -99,7 +99,7 @@ function AISummaryPanel({ video, onGenerated }: {
       >
         <span className="text-sm">✨</span>
         <span className={data ? 'text-violet-500 group-hover:text-violet-400' : ''}>
-          {data ? 'Resumo IA' : 'Gerar resumo IA'}
+          {data ? 'Resumo' : 'Ver resumo'}
         </span>
       </button>
     );
@@ -109,7 +109,7 @@ function AISummaryPanel({ video, onGenerated }: {
     <div className="mt-2 rounded-xl border border-violet-500/20 bg-violet-950/20 overflow-hidden animate-slide-up">
       <div className="flex items-center justify-between px-3 py-2 border-b border-violet-500/10">
         <span className="text-xs font-semibold text-violet-400 flex items-center gap-1.5">
-          ✨ Resumo IA
+          ✨ Resumo
         </span>
         <button onClick={() => setOpen(false)} className="text-zinc-600 hover:text-zinc-400 text-xs transition-colors">fechar</button>
       </div>

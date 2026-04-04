@@ -111,7 +111,7 @@ export default function QuizModal({ planId, day, dayTheme, onClose }: Props) {
                 <div className="absolute inset-3 rounded-full bg-violet-600/10 flex items-center justify-center text-lg">🧪</div>
               </div>
               <div className="text-center">
-                <p className="text-zinc-200 text-sm font-medium">Gerando quiz com IA...</p>
+                <p className="text-zinc-200 text-sm font-medium">Gerando quiz...</p>
                 <p className="text-zinc-600 text-xs mt-1">Isso pode levar alguns segundos</p>
               </div>
             </div>

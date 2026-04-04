@@ -31,7 +31,7 @@ interface Plan {
 function LandingPage() {
   const features = [
     { icon: '🎬', title: 'Importe canais do YouTube', desc: 'Adicione qualquer canal ou playlist e nós extraímos todos os vídeos automaticamente.' },
-    { icon: '✨', title: 'Plano gerado por IA', desc: 'A IA organiza os vídeos em um plano dia a dia com ordem de dificuldade e temas.' },
+    { icon: '✨', title: 'Plano organizado para você', desc: 'Os vídeos são organizados em um plano dia a dia com ordem de dificuldade e temas definidos.' },
     { icon: '📊', title: 'Acompanhe o progresso', desc: 'Marque vídeos como assistidos, escreva anotações e veja seu avanço em tempo real.' },
     { icon: '🗺️', title: 'Mapas mentais', desc: 'Gere mapas mentais do dia ou do plano inteiro com um clique e faça download.' },
   ];
@@ -39,7 +39,7 @@ function LandingPage() {
   const steps = [
     { n: '1', title: 'Crie sua conta', desc: 'Cadastro rápido com email ou Google.' },
     { n: '2', title: 'Adicione um canal', desc: 'Cole a URL de qualquer canal ou playlist do YouTube.' },
-    { n: '3', title: 'Gere o plano', desc: 'A IA cria um plano personalizado com base nos seus tópicos e horas disponíveis.' },
+    { n: '3', title: 'Gere o plano', desc: 'Receba um plano personalizado com base nos seus tópicos e horas disponíveis.' },
     { n: '4', title: 'Estude e progrida', desc: 'Siga o plano, anote insights e acompanhe seu crescimento.' },
   ];
 
@@ -76,7 +76,7 @@ function LandingPage() {
       <section className="relative max-w-5xl mx-auto px-6 pt-24 pb-20 text-center animate-slide-up">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 border border-violet-500/25 rounded-full text-violet-400 text-xs font-medium mb-6">
           <span className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-pulse" />
-          YouTube + IA para seus estudos
+          Do YouTube para o seu plano de estudos
         </div>
         <h1 className="text-5xl md:text-6xl font-bold leading-tight mb-6">
           <span className="bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
@@ -84,7 +84,7 @@ function LandingPage() {
           </span>
           <br />
           <span className="bg-gradient-to-r from-violet-400 via-violet-300 to-cyan-400 bg-clip-text text-transparent">
-            guiado pela IA
+            no seu ritmo
           </span>
         </h1>
         <p className="text-zinc-400 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
@@ -146,7 +146,7 @@ function LandingPage() {
       </section>
 
       <footer className="text-center pb-10 text-zinc-700 text-xs">
-        © {new Date().getFullYear()} StudyPlanner — feito com ☕ e IA
+        © {new Date().getFullYear()} StudyPlanner — feito com ☕
       </footer>
     </main>
   );
@@ -250,7 +250,7 @@ export default function Home() {
               <h1 className="text-base font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent leading-none">
                 StudyPlanner
               </h1>
-              <p className="text-[10px] text-zinc-600 mt-0.5">YouTube + IA para seus estudos</p>
+              <p className="text-[10px] text-zinc-600 mt-0.5">Seus estudos, organizados</p>
             </div>
           </div>
 

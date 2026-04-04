@@ -188,7 +188,7 @@ function LoginForm() {
           {mode === 'options' && (
             <>
               {logoSection}
-              <p className="text-zinc-500 text-sm text-center -mt-3 mb-6">Planos de estudo com YouTube + IA</p>
+              <p className="text-zinc-500 text-sm text-center -mt-3 mb-6">Seus estudos, organizados</p>
 
               <button
                 onClick={handleGoogleLogin}
