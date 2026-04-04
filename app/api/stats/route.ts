@@ -57,18 +57,10 @@ export async function GET() {
     args: [userId],
   });
 
-  const cacheResult = await db.execute({
-    sql: `SELECT COUNT(DISTINCT channel_id) as channels_cached, COUNT(*) as total_cached
-          FROM channel_videos_cache
-          WHERE fetched_at > datetime('now', '-7 days')`,
-    args: [],
-  });
-
   return NextResponse.json({
     totals,
     plansCount,
     planProgress: planProgressResult.rows,
     byLevel: byLevelResult.rows,
-    cacheStats: cacheResult.rows[0] ?? { channels_cached: 0, total_cached: 0 },
   });
 }

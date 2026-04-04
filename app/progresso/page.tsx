@@ -24,7 +24,6 @@ interface StatsData {
     watched_minutes: number;
   }[];
   byLevel: { level: string; total: number; watched: number }[];
-  cacheStats: { channels_cached: number; total_cached: number };
 }
 
 function formatMinutes(minutes: number): string {
@@ -124,7 +123,7 @@ export default function ProgressoPage() {
 
   if (!stats) return null;
 
-  const { totals, planProgress, byLevel, cacheStats } = stats;
+  const { totals, planProgress, byLevel } = stats;
   const overallPct = totals.total_videos > 0
     ? Math.round((totals.watched_videos / totals.total_videos) * 100)
     : 0;
@@ -184,7 +183,6 @@ export default function ProgressoPage() {
             <StatCard label="Progresso" value={`${overallPct}%`} sub={`${totals.watched_videos} de ${totals.total_videos} vídeos`} color="violet" icon="📈" />
             <StatCard label="Horas assistidas" value={formatMinutes(totals.watched_minutes)} sub={`de ${formatMinutes(totals.total_minutes)}`} color="emerald" icon="⏱️" />
             <StatCard label="Planos criados" value={String(stats.plansCount)} sub="planos de estudo" color="blue" icon="📋" />
-            <StatCard label="Cache de vídeos" value={String(cacheStats.total_cached)} sub={`${cacheStats.channels_cached} fontes`} color="amber" icon="⚡" />
           </div>
         </section>
 
