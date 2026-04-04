@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { ensureInit } from '@/lib/db';
 import { auth } from '@/auth';
-import { getAllChannelVideos, getPlaylistVideos, filterVideosByTopics, VideoInfo } from '@/lib/youtube';
-import type { Client } from '@libsql/client';
+import { filterVideosByTopics, VideoInfo } from '@/lib/youtube';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const client = new Anthropic();
-const CACHE_DAYS = 7;
 
 interface PlanVideo {
   title: string;
@@ -26,45 +24,6 @@ interface PlanDay {
   videos: PlanVideo[];
 }
 
-async function getVideosWithCache(
-  channelId: string,
-  isPlaylist: boolean,
-  userId: string,
-  db: Client
-): Promise<{ videos: VideoInfo[]; fromCache: boolean }> {
-  const cached = await db.execute({
-    sql: `SELECT video_id as videoId, title, url, channel_name as channelName,
-                 duration_minutes as durationMinutes, thumbnail
-          FROM channel_videos_cache
-          WHERE user_id = ? AND channel_id = ?
-          AND fetched_at > datetime('now', '-${CACHE_DAYS} days')`,
-    args: [userId, channelId],
-  });
-
-  if (cached.rows.length > 0) {
-    console.log(`[Cache] ${cached.rows.length} vídeos para ${channelId} (cache válido).`);
-    return { videos: cached.rows as unknown as VideoInfo[], fromCache: true };
-  }
-
-  const videos = isPlaylist
-    ? await getPlaylistVideos(channelId)
-    : await getAllChannelVideos(channelId);
-
-  if (videos.length > 0) {
-    await db.batch(
-      videos.map((v) => ({
-        sql: `INSERT OR REPLACE INTO channel_videos_cache
-              (user_id, channel_id, video_id, title, url, channel_name, duration_minutes, thumbnail, fetched_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        args: [userId, channelId, v.videoId, v.title, v.url, v.channelName, v.durationMinutes, v.thumbnail ?? null],
-      })),
-      'write'
-    );
-  }
-
-  console.log(`[Cache] ${videos.length} vídeos para ${channelId} buscados e salvos.`);
-  return { videos, fromCache: false };
-}
 
 function buildPrompt(
   videoList: string,
@@ -251,33 +210,28 @@ export async function POST(req: NextRequest) {
     );
     console.log(`[Plano] ${usedUrls.size} vídeos já usados.`);
 
-    // Busca vídeos de todos os canais em PARALELO — reduz de N×10s para ~10s
-    const channelFetches = await Promise.allSettled(
-      channels.map((ch) => getVideosWithCache(ch.channel_id, ch.is_playlist === 1, userId, db))
+    // Lê APENAS do cache — YouTube foi buscado pelo /api/plano/prefetch
+    const cacheResults = await Promise.all(
+      channels.map((ch) =>
+        db.execute({
+          sql: `SELECT video_id as videoId, title, url, channel_name as channelName,
+                       duration_minutes as durationMinutes, thumbnail
+                FROM channel_videos_cache
+                WHERE user_id = ? AND channel_id = ?
+                AND fetched_at > datetime('now', '-7 days')`,
+          args: [userId, ch.channel_id],
+        })
+      )
     );
 
     const allVideos: VideoInfo[] = [];
-    let quotaError = false;
-
-    for (let i = 0; i < channelFetches.length; i++) {
-      const r = channelFetches[i];
-      if (r.status === 'fulfilled') {
-        allVideos.push(...r.value.videos);
-      } else {
-        const msg = String(r.reason);
-        if (msg.includes('quota') || msg.includes('403')) quotaError = true;
-        console.error(`[YouTube] Erro no canal ${channels[i].channel_id}:`, r.reason);
-      }
+    for (const result of cacheResults) {
+      allVideos.push(...(result.rows as unknown as VideoInfo[]));
     }
 
     if (allVideos.length === 0) {
-      if (quotaError) {
-        return NextResponse.json({
-          error: 'Cota diária da YouTube API esgotada. Aguarde até amanhã.',
-        }, { status: 429 });
-      }
       return NextResponse.json({
-        error: 'Nenhum vídeo encontrado nos seus canais.',
+        error: 'Nenhum vídeo encontrado. Tente novamente.',
       }, { status: 404 });
     }
 
