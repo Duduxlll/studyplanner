@@ -251,17 +251,22 @@ export async function POST(req: NextRequest) {
     );
     console.log(`[Plano] ${usedUrls.size} vídeos já usados.`);
 
+    // Busca vídeos de todos os canais em PARALELO — reduz de N×10s para ~10s
+    const channelFetches = await Promise.allSettled(
+      channels.map((ch) => getVideosWithCache(ch.channel_id, ch.is_playlist === 1, userId, db))
+    );
+
     const allVideos: VideoInfo[] = [];
     let quotaError = false;
 
-    for (const ch of channels) {
-      try {
-        const { videos } = await getVideosWithCache(ch.channel_id, ch.is_playlist === 1, userId, db);
-        allVideos.push(...videos);
-      } catch (ytErr: unknown) {
-        const msg = String(ytErr);
+    for (let i = 0; i < channelFetches.length; i++) {
+      const r = channelFetches[i];
+      if (r.status === 'fulfilled') {
+        allVideos.push(...r.value.videos);
+      } else {
+        const msg = String(r.reason);
         if (msg.includes('quota') || msg.includes('403')) quotaError = true;
-        console.error(`[YouTube] Erro no canal ${ch.channel_id}:`, ytErr);
+        console.error(`[YouTube] Erro no canal ${channels[i].channel_id}:`, r.reason);
       }
     }
 
