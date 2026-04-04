@@ -86,7 +86,12 @@ export default function PlanCreator({ onClose }: Props) {
         }),
       });
 
-      const data = await res.json();
+      let data: { planId?: number; error?: string };
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Serviço temporariamente indisponível. Tente novamente em alguns segundos.');
+      }
       if (!res.ok) throw new Error(data.error ?? 'Erro ao gerar plano');
 
       router.push(`/plano?id=${data.planId}`);
