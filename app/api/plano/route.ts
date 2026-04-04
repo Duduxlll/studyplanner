@@ -128,7 +128,7 @@ Retorne SOMENTE um JSON válido, sem markdown:
 }`;
 }
 
-async function callClaude(prompt: string): Promise<PlanDay[]> {
+async function callClaudeOnce(prompt: string): Promise<PlanDay[]> {
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 16000,
@@ -136,26 +136,47 @@ async function callClaude(prompt: string): Promise<PlanDay[]> {
   });
 
   if (message.stop_reason === 'max_tokens') {
-    console.error('[Claude] Resposta truncada (max_tokens atingido).');
-    throw new Error('Resposta truncada: aumente as horas/dia ou reduza os dias para gerar um plano menor.');
+    throw new Error('Resposta cortada pelo limite de tokens. Tente reduzir os dias ou as horas/dia.');
   }
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : '';
 
+  // API da Anthropic às vezes retorna erro em texto puro em vez de lançar exceção
+  if (!raw || raw.trimStart().startsWith('An error') || raw.trimStart().startsWith('Error')) {
+    console.error('[Claude] Resposta de erro da API:', raw.slice(0, 200));
+    throw new Error('Serviço de IA indisponível momentaneamente. Tente novamente em alguns segundos.');
+  }
+
   let cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  if (jsonMatch) cleaned = jsonMatch[0];
 
+  if (!jsonMatch) {
+    console.error('[Claude] Nenhum JSON na resposta:', raw.slice(0, 300));
+    throw new Error('A IA não retornou o formato esperado. Tente novamente.');
+  }
+
+  cleaned = jsonMatch[0];
+
+  const parsed = JSON.parse(cleaned);
+  if (!parsed?.days || !Array.isArray(parsed.days)) {
+    throw new Error('Estrutura de resposta inválida (campo "days" ausente).');
+  }
+
+  return parsed.days as PlanDay[];
+}
+
+async function callClaude(prompt: string): Promise<PlanDay[]> {
   try {
-    const parsed = JSON.parse(cleaned);
-    if (!parsed?.days || !Array.isArray(parsed.days)) {
-      throw new Error('Campo "days" ausente ou inválido');
+    return await callClaudeOnce(prompt);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Retry automático apenas para erros transitórios da API
+    if (msg.includes('indisponível') || msg.includes('overloaded') || msg.includes('529')) {
+      console.warn('[Claude] Erro transitório, tentando novamente em 5s...');
+      await new Promise(r => setTimeout(r, 5000));
+      return await callClaudeOnce(prompt);
     }
-    return parsed.days as PlanDay[];
-  } catch (parseErr) {
-    console.error('[Claude] Falha ao parsear JSON. Stop reason:', message.stop_reason);
-    console.error('[Claude] Início da resposta:', raw.slice(0, 500));
-    throw parseErr;
+    throw err;
   }
 }
 
