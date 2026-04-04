@@ -130,13 +130,17 @@ Retorne SOMENTE um JSON válido, sem markdown:
 
 async function callClaudeOnce(prompt: string): Promise<PlanDay[]> {
   // Envolve a chamada à API em try/catch para capturar erros do SDK (rate limit, overload, etc.)
+  // timeout: 50s → garante que a função nunca trava além do limite de 60s da Vercel
   let message: Awaited<ReturnType<typeof client.messages.create>>;
   try {
-    message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 16000,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    message = await client.messages.create(
+      {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 16000,
+        messages: [{ role: 'user', content: prompt }],
+      },
+      { timeout: 50000 }
+    );
   } catch (sdkErr) {
     const msg = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
     console.error('[Claude] Erro SDK:', msg.slice(0, 300));
@@ -186,13 +190,16 @@ function isTransient(msg: string) {
 }
 
 async function callClaude(prompt: string): Promise<PlanDay[]> {
+  const t0 = Date.now();
   try {
     return await callClaudeOnce(prompt);
   } catch (err) {
+    const elapsed = Date.now() - t0;
     const msg = err instanceof Error ? err.message : String(err);
-    if (isTransient(msg)) {
-      console.warn('[Claude] Erro transitório, retry em 4s...', msg.slice(0, 120));
-      await new Promise(r => setTimeout(r, 4000));
+    // Só faz retry se a falha foi RÁPIDA (< 3s) — rejeição imediata por sobrecarga.
+    // Falhas lentas (timeout de 50s) não devem ser retentadas: não há tempo.
+    if (isTransient(msg) && elapsed < 3000) {
+      console.warn('[Claude] Rejeição rápida, retry imediato...', msg.slice(0, 120));
       return await callClaudeOnce(prompt);
     }
     throw err;
