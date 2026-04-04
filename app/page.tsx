@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAvatar } from '@/components/AvatarProvider';
 import { upsertSavedAccount } from '@/lib/saved-accounts';
+import { Sk } from '@/components/Skeleton';
 
 interface Channel {
   id: number;
@@ -164,6 +165,7 @@ export default function Home() {
   const [deletingPlan, setDeletingPlan] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  const [loadingData, setLoadingData] = useState(true);
 
   async function loadChannels() {
     const res = await fetch('/api/channels');
@@ -177,7 +179,7 @@ export default function Home() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      // Uma única chamada para channels + plans em paralelo com o profile
+      setLoadingData(true);
       Promise.all([
         fetch('/api/home').then(r => r.json()),
         fetch('/api/profile').then(r => r.json()),
@@ -196,7 +198,7 @@ export default function Home() {
             provider: session.user.image && !profile.user?.avatar_url ? 'google' : 'credentials',
           });
         }
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => setLoadingData(false));
     }
   }, [status]);
 
@@ -220,16 +222,75 @@ export default function Home() {
     setDeletingPlan(null);
   }
 
-  if (status === 'loading') {
+  if (status === 'loading') return null;
+
+  if (status === 'unauthenticated') return <LandingPage />;
+
+  if (loadingData) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <span className="w-8 h-8 border-2 border-zinc-700 border-t-violet-400 rounded-full animate-spin" />
+      <div className="min-h-screen bg-zinc-950 text-white">
+        {/* Header skeleton */}
+        <header className="sticky top-0 z-40 border-b border-white/[0.05] bg-zinc-950/80 backdrop-blur-xl px-6 py-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sk className="w-8 h-8 rounded-xl" />
+              <div className="flex flex-col gap-1.5">
+                <Sk className="w-28 h-3.5 rounded-md" />
+                <Sk className="w-20 h-2.5 rounded-md" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Sk className="w-20 h-8 rounded-lg" />
+              <Sk className="w-20 h-8 rounded-lg" />
+              <Sk className="w-8 h-8 rounded-full" />
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-12">
+          {/* Canais skeleton */}
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <Sk className="w-1 h-5 rounded-full" />
+              <Sk className="w-24 h-3 rounded-md" />
+            </div>
+            <div className="flex gap-5 flex-wrap">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <Sk className="w-20 h-20 rounded-full" />
+                  <Sk className="w-14 h-2.5 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Planos skeleton */}
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <Sk className="w-1 h-5 rounded-full" />
+              <Sk className="w-28 h-3 rounded-md" />
+            </div>
+            <div className="flex flex-col gap-3">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 bg-zinc-900/50 border border-zinc-800/60 rounded-2xl px-5 py-4">
+                  <div className="flex-1 flex flex-col gap-2">
+                    <Sk className="w-48 h-3.5 rounded-md" />
+                    <div className="flex gap-1.5">
+                      <Sk className="w-16 h-5 rounded-full" />
+                      <Sk className="w-16 h-5 rounded-full" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <Sk className="w-14 h-3.5 rounded-md" />
+                    <Sk className="w-10 h-2.5 rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     );
-  }
-
-  if (status === 'unauthenticated') {
-    return <LandingPage />;
   }
 
   return (

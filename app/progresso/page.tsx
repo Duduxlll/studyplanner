@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { Sk } from '@/components/Skeleton';
 
 interface StatsData {
   totals: {
@@ -110,12 +111,111 @@ export default function ProgressoPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.2)]">
-            <span className="w-6 h-6 border-2 border-zinc-700 border-t-violet-400 rounded-full animate-spin" />
+      <div className="min-h-screen bg-zinc-950 text-white">
+        {/* Header skeleton */}
+        <header className="sticky top-0 z-40 border-b border-white/[0.05] bg-zinc-950/80 backdrop-blur-xl px-6 py-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Sk className="w-16 h-3 rounded-md" />
+              <div className="w-px h-4 bg-zinc-800" />
+              <div className="flex items-center gap-2.5">
+                <Sk className="w-7 h-7 rounded-lg" />
+                <div className="flex flex-col gap-1.5">
+                  <Sk className="w-36 h-3 rounded-md" />
+                  <Sk className="w-24 h-2.5 rounded-md" />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <Sk className="w-12 h-6 rounded-md" />
+              <Sk className="w-16 h-2.5 rounded-md" />
+            </div>
           </div>
-          <p className="text-zinc-500 text-sm">Carregando progresso...</p>
+        </header>
+
+        <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-8">
+          {/* Stats cards skeleton */}
+          <section>
+            <div className="flex items-center gap-3 mb-5">
+              <Sk className="w-1 h-5 rounded-full" />
+              <Sk className="w-20 h-3 rounded-md" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-zinc-900/60 border border-zinc-800/60 rounded-2xl p-4">
+                  <Sk className="w-8 h-8 rounded-xl mb-3" />
+                  <Sk className="w-20 h-2.5 rounded-md mb-2" />
+                  <Sk className="w-16 h-6 rounded-md mb-1.5" />
+                  <Sk className="w-24 h-2.5 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Barra de progresso skeleton */}
+          <section className="bg-zinc-900/60 border border-zinc-800/60 rounded-2xl px-6 py-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col gap-1.5">
+                <Sk className="w-28 h-3.5 rounded-md" />
+                <Sk className="w-40 h-2.5 rounded-md" />
+              </div>
+              <Sk className="w-14 h-8 rounded-md" />
+            </div>
+            <Sk className="w-full h-4 rounded-full" />
+          </section>
+
+          {/* Por nível skeleton */}
+          <section>
+            <div className="flex items-center gap-3 mb-5">
+              <Sk className="w-1 h-5 rounded-full" />
+              <Sk className="w-16 h-3 rounded-md" />
+            </div>
+            <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-2xl px-5 py-5 flex flex-col gap-5">
+              {[...Array(3)].map((_, i) => (
+                <div key={i}>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <Sk className="w-8 h-8 rounded-xl" />
+                      <div className="flex flex-col gap-1.5">
+                        <Sk className="w-24 h-3 rounded-md" />
+                      </div>
+                    </div>
+                    <Sk className="w-10 h-3 rounded-md" />
+                  </div>
+                  <Sk className="w-full h-2.5 rounded-full" />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Planos skeleton */}
+          <section>
+            <div className="flex items-center gap-3 mb-5">
+              <Sk className="w-1 h-5 rounded-full" />
+              <Sk className="w-20 h-3 rounded-md" />
+            </div>
+            <div className="flex flex-col gap-3">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="bg-zinc-900/60 border border-zinc-800/60 rounded-2xl px-5 py-4">
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex flex-col gap-2">
+                      <Sk className="w-48 h-3.5 rounded-md" />
+                      <div className="flex gap-1.5">
+                        <Sk className="w-16 h-5 rounded-full" />
+                        <Sk className="w-16 h-5 rounded-full" />
+                      </div>
+                    </div>
+                    <Sk className="w-12 h-8 rounded-md" />
+                  </div>
+                  <Sk className="w-full h-2 rounded-full mb-2" />
+                  <div className="flex justify-between">
+                    <Sk className="w-28 h-2.5 rounded-md" />
+                    <Sk className="w-24 h-2.5 rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     );

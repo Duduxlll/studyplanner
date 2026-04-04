@@ -7,6 +7,7 @@ import MindMapModal from '@/components/MindMapModal';
 import QuizModal from '@/components/QuizModal';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { Sk } from '@/components/Skeleton';
 
 interface Video {
   id: number;
@@ -101,12 +102,73 @@ function PlanoContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.2)]">
-            <span className="w-6 h-6 border-2 border-zinc-700 border-t-violet-400 rounded-full animate-spin" />
+      <div className="min-h-screen bg-zinc-950 text-white">
+        {/* Header skeleton */}
+        <header className="sticky top-0 z-40 border-b border-white/[0.05] bg-zinc-950/85 backdrop-blur-xl px-6 py-4">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <Sk className="w-12 h-3 rounded-md flex-shrink-0" />
+              <div className="w-px h-4 bg-zinc-800 flex-shrink-0" />
+              <div className="flex flex-col gap-1.5 min-w-0">
+                <Sk className="w-40 h-3.5 rounded-md" />
+                <div className="flex gap-1.5">
+                  <Sk className="w-14 h-5 rounded-full" />
+                  <Sk className="w-14 h-5 rounded-full" />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <Sk className="w-10 h-5 rounded-md" />
+              <Sk className="w-16 h-2.5 rounded-md" />
+            </div>
           </div>
-          <p className="text-zinc-500 text-sm">Carregando plano...</p>
+          <div className="max-w-4xl mx-auto mt-3">
+            <Sk className="w-full h-1 rounded-full" />
+          </div>
+        </header>
+
+        <div className="max-w-4xl mx-auto px-6 py-6 flex flex-col gap-6">
+          {/* Botões mapa skeleton */}
+          <div className="flex gap-2">
+            <Sk className="w-32 h-8 rounded-xl" />
+            <Sk className="w-28 h-8 rounded-xl" />
+          </div>
+
+          {/* Seletor de dias skeleton */}
+          <div className="flex gap-2 flex-wrap">
+            {[...Array(7)].map((_, i) => (
+              <Sk key={i} className="w-14 h-8 rounded-xl" />
+            ))}
+          </div>
+
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-3 gap-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-4 py-3">
+                <Sk className="w-20 h-2.5 rounded-md mb-2" />
+                <Sk className="w-12 h-5 rounded-md mb-1.5" />
+                <Sk className="w-24 h-2.5 rounded-md" />
+              </div>
+            ))}
+          </div>
+
+          {/* Vídeos skeleton */}
+          <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-2xl p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between mb-1">
+              <Sk className="w-24 h-4 rounded-md" />
+              <Sk className="w-20 h-7 rounded-xl" />
+            </div>
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 bg-zinc-800/40 rounded-xl px-4 py-3">
+                <Sk className="w-5 h-5 rounded-md flex-shrink-0" />
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <Sk className="w-3/4 h-3 rounded-md" />
+                  <Sk className="w-1/3 h-2.5 rounded-md" />
+                </div>
+                <Sk className="w-12 h-2.5 rounded-md flex-shrink-0" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
