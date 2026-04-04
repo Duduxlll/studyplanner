@@ -99,7 +99,7 @@ async function callClaudeOnce(prompt: string): Promise<PlanDay[]> {
         max_tokens: 16000,
         messages: [{ role: 'user', content: prompt }],
       },
-      { timeout: 50000 }
+      { timeout: 240000 }
     );
   } catch (sdkErr) {
     const msg = sdkErr instanceof Error ? sdkErr.message : String(sdkErr);
@@ -349,7 +349,7 @@ export async function POST(req: NextRequest) {
     if (raw.includes('credit') || raw.includes('billing') || raw.includes('balance')) {
       friendly = 'Créditos da API esgotados. Entre em contato com o suporte.';
     } else if (raw.includes('timeout') || raw.includes('TIMEOUT') || raw.includes('timed out')) {
-      friendly = 'A geração demorou demais. Tente um plano com menos dias ou menos horas/dia.';
+      friendly = 'A IA demorou para responder. Tente novamente em alguns segundos.';
     } else if (raw.includes('quota') || raw.includes('rate') || raw.includes('429')) {
       friendly = 'Muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.';
     } else if (raw.includes('truncada') || raw.includes('max_tokens')) {
