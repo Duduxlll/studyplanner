@@ -72,17 +72,7 @@ export default function PlanCreator({ onClose }: Props) {
     setError('');
 
     try {
-      // Etapa 1: buscar e cachear vídeos dos canais (~5-15s)
-      setStatus('Buscando vídeos dos canais...');
-      const prefetchRes = await fetch('/api/plano/prefetch', { method: 'POST' });
-      if (!prefetchRes.ok) {
-        let errData: { error?: string } = {};
-        try { errData = await prefetchRes.json(); } catch { /* ignorar */ }
-        throw new Error(errData.error ?? 'Erro ao buscar vídeos dos canais.');
-      }
-
-      // Etapa 2: gerar plano com IA (~15-25s, só lê cache + chama Claude)
-      setStatus('Gerando plano com IA...');
+      setStatus('Buscando vídeos e gerando plano com IA...');
       const res = await fetch('/api/plano', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

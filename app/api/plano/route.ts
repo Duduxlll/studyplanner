@@ -3,9 +3,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { ensureInit } from '@/lib/db';
 import { auth } from '@/auth';
 import { filterVideosByTopics, VideoInfo } from '@/lib/youtube';
+import { getVideosWithCache } from '@/lib/video-cache';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const client = new Anthropic();
 
@@ -210,29 +211,30 @@ export async function POST(req: NextRequest) {
     );
     console.log(`[Plano] ${usedUrls.size} vídeos já usados.`);
 
-    // Lê APENAS do cache — YouTube foi buscado pelo /api/plano/prefetch
-    const cacheResults = await Promise.all(
-      channels.map((ch) =>
-        db.execute({
-          sql: `SELECT video_id as videoId, title, url, channel_name as channelName,
-                       duration_minutes as durationMinutes, thumbnail
-                FROM channel_videos_cache
-                WHERE user_id = ? AND channel_id = ?
-                AND fetched_at > datetime('now', '-7 days')`,
-          args: [userId, ch.channel_id],
-        })
-      )
+    // Busca vídeos de todos os canais em paralelo (com cache de 7 dias)
+    const channelFetches = await Promise.allSettled(
+      channels.map((ch) => getVideosWithCache(ch.channel_id, ch.is_playlist === 1, userId, db))
     );
 
     const allVideos: VideoInfo[] = [];
-    for (const result of cacheResults) {
-      allVideos.push(...(result.rows as unknown as VideoInfo[]));
+    let quotaError = false;
+
+    for (let i = 0; i < channelFetches.length; i++) {
+      const r = channelFetches[i];
+      if (r.status === 'fulfilled') {
+        allVideos.push(...r.value.videos);
+      } else {
+        const msg = String(r.reason);
+        if (msg.includes('quota') || msg.includes('403')) quotaError = true;
+        console.error(`[YouTube] Erro no canal ${channels[i].channel_id}:`, r.reason);
+      }
     }
 
     if (allVideos.length === 0) {
-      return NextResponse.json({
-        error: 'Nenhum vídeo encontrado. Tente novamente.',
-      }, { status: 404 });
+      if (quotaError) {
+        return NextResponse.json({ error: 'Cota diária da YouTube API esgotada. Aguarde até amanhã.' }, { status: 429 });
+      }
+      return NextResponse.json({ error: 'Nenhum vídeo encontrado nos seus canais.' }, { status: 404 });
     }
 
     const seenIds = new Set<string>();
@@ -266,7 +268,7 @@ export async function POST(req: NextRequest) {
     const numBatches = Math.ceil(total_days / DAYS_PER_BATCH);
 
     function videosNeeded(days: number) {
-      return Math.min(150, Math.ceil((hours_per_day * 60) / 40) * days * 2);
+      return Math.min(200, Math.ceil((hours_per_day * 60) / 40) * days * 2);
     }
 
     function toList(videos: VideoInfo[], limit: number) {

@@ -148,7 +148,7 @@ async function fetchAllFromPlaylist(playlistId: string): Promise<VideoInfo[]> {
   const allVideoIds: string[] = [];
   let pageToken: string | undefined;
   let pages = 0;
-  const MAX_PAGES = 2; // ~100 vídeos por canal — rápido e suficiente
+  const MAX_PAGES = 4; // ~200 vídeos por canal
 
   do {
     const playlistRes = await youtube.playlistItems.list({
