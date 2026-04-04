@@ -293,10 +293,14 @@ export async function POST(req: NextRequest) {
       }, { status: 404 });
     }
 
-    // Calcula quantos vídeos enviar por chamada com base nos parâmetros do plano
-    // Estimativa: (horas/dia × 60 / duração média de 40min) × dias × 1.5 de folga, máx 200
+    // ── Batching: máx 5 dias por lote, todos em paralelo ──────────────────────
+    // Cada lote gera ~1.500 tokens (~15-20s no Sonnet), bem abaixo do limite de 60s.
+    // Todos os lotes disparam ao mesmo tempo → tempo total ≈ tempo de 1 lote.
+    const DAYS_PER_BATCH = 5;
+    const numBatches = Math.ceil(total_days / DAYS_PER_BATCH);
+
     function videosNeeded(days: number) {
-      return Math.min(200, Math.ceil((hours_per_day * 60) / 40) * days * 2);
+      return Math.min(150, Math.ceil((hours_per_day * 60) / 40) * days * 2);
     }
 
     function toList(videos: VideoInfo[], limit: number) {
@@ -305,56 +309,36 @@ export async function POST(req: NextRequest) {
       ).join('\n');
     }
 
+    // Divide o pool de vídeos igualmente entre os lotes (sem sobreposição)
+    const perBatch = Math.ceil(videosValidos.length / numBatches);
+
+    const batchPrompts = Array.from({ length: numBatches }, (_, i) => {
+      const dayStart = i * DAYS_PER_BATCH + 1;
+      const dayEnd = Math.min((i + 1) * DAYS_PER_BATCH, total_days);
+      const daysInBatch = dayEnd - dayStart + 1;
+      const pool = videosValidos.slice(i * perBatch, (i + 1) * perBatch);
+      return buildPrompt(
+        toList(pool, videosNeeded(daysInBatch)),
+        dayStart, dayEnd, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
+      );
+    });
+
+    console.log(`[Plano] Gerando ${numBatches} lote(s) de até ${DAYS_PER_BATCH} dias em paralelo...`);
+    const results = await Promise.allSettled(batchPrompts.map((p) => callClaude(p)));
+
     let allDays: PlanDay[] = [];
-
-    if (total_days <= 12) {
-      // ── Plano curto: 1 chamada ──────────────────────────────────────────────
-      const prompt = buildPrompt(
-        toList(videosValidos, videosNeeded(total_days)),
-        1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
-      );
-      allDays = await callClaude(prompt);
-
-    } else {
-      // ── Plano longo: 2 chamadas em PARALELO ─────────────────────────────────
-      // Divide o pool de vídeos em dois grupos já de antemão, sem esperar o lote 1
-      const midDay = Math.ceil(total_days / 2);
-      const daysLote2 = total_days - midDay;
-
-      const metade = Math.ceil(videosValidos.length / 2);
-      const pool1 = videosValidos.slice(0, metade);
-      const pool2 = videosValidos.slice(metade);
-
-      const prompt1 = buildPrompt(
-        toList(pool1, videosNeeded(midDay)),
-        1, midDay, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
-      );
-      const prompt2 = buildPrompt(
-        toList(pool2, videosNeeded(daysLote2)),
-        midDay + 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
-      );
-
-      // Dispara os dois ao mesmo tempo — tempo total ≈ tempo de 1 chamada
-      const [result1, result2] = await Promise.allSettled([
-        callClaude(prompt1),
-        callClaude(prompt2),
-      ]);
-
-      if (result1.status === 'rejected') {
-        const msg = result1.reason instanceof Error ? result1.reason.message : String(result1.reason);
-        console.error('[Claude] Lote 1 falhou:', msg);
-        throw new Error(msg);   // deixa o catch externo formatar a resposta
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (result.status === 'rejected') {
+        const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        console.error(`[Claude] Lote ${i + 1} falhou:`, msg);
+        if (i === 0) throw new Error(msg);  // lote 1 é obrigatório
+        console.warn(`[Claude] Lote ${i + 1} ignorado (plano parcial).`);
+      } else {
+        allDays = [...allDays, ...result.value];
       }
-
-      const days1 = result1.value;
-      const days2 = result2.status === 'fulfilled' ? result2.value : [];
-      if (result2.status === 'rejected') {
-        console.error('[Claude] Lote 2 falhou (plano parcial):', result2.reason);
-      }
-
-      allDays = [...days1, ...days2];
-      console.log(`[Plano] Gerado em paralelo: ${days1.length} + ${days2.length} dias.`);
     }
+    console.log(`[Plano] Total gerado: ${allDays.length} dias em ${numBatches} lote(s).`);
 
     // Salva o plano
     const planResult = await db.execute({
