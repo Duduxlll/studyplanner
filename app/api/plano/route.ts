@@ -372,7 +372,9 @@ export async function GET() {
     args: [session.user.id],
   });
 
-  return NextResponse.json(result.rows);
+  const res = NextResponse.json(result.rows);
+  res.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+  return res;
 }
 
 export async function DELETE(req: NextRequest) {

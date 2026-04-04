@@ -121,6 +121,13 @@ async function runInit(db: Client): Promise<void> {
     )
   `);
 
+  // Indexes para queries mais rápidas
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_channels_user_id ON channels(user_id, created_at)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_plans_user_id ON plans(user_id, created_at)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_plan_videos_plan_id ON plan_videos(plan_id)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_plan_videos_plan_day ON plan_videos(plan_id, day, order_in_day)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_cache_user_channel ON channel_videos_cache(user_id, channel_id, fetched_at)');
+
   await runMigrations(db);
 }
 

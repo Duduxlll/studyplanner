@@ -177,26 +177,26 @@ export default function Home() {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      loadChannels();
-      loadPlans();
-      // Carrega avatar salvo no banco (pode ser diferente da foto do Google)
-      fetch('/api/profile')
-        .then(r => r.json())
-        .then(d => {
-          const url = d.user?.avatar_url || d.googleImage || '';
-          if (url) setAvatarUrl(url);
-          setHasPassword(d.has_password ?? true);
-          // Atualiza conta salva com nome e avatar reais (captura Google também)
-          if (session?.user?.email) {
-            upsertSavedAccount({
-              email: session.user.email,
-              name: d.user?.name || session.user.name || '',
-              avatarUrl: url,
-              provider: session.user.image && !d.user?.avatar_url ? 'google' : 'credentials',
-            });
-          }
-        })
-        .catch(() => {});
+      // Uma única chamada para channels + plans em paralelo com o profile
+      Promise.all([
+        fetch('/api/home').then(r => r.json()),
+        fetch('/api/profile').then(r => r.json()),
+      ]).then(([home, profile]) => {
+        if (Array.isArray(home.channels)) setChannels(home.channels);
+        if (Array.isArray(home.plans)) setPlans(home.plans);
+
+        const url = profile.user?.avatar_url || profile.googleImage || '';
+        if (url) setAvatarUrl(url);
+        setHasPassword(profile.has_password ?? true);
+        if (session?.user?.email) {
+          upsertSavedAccount({
+            email: session.user.email,
+            name: profile.user?.name || session.user.name || '',
+            avatarUrl: url,
+            provider: session.user.image && !profile.user?.avatar_url ? 'google' : 'credentials',
+          });
+        }
+      }).catch(() => {});
     }
   }, [status]);
 
