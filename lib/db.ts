@@ -109,6 +109,18 @@ async function runInit(db: Client): Promise<void> {
     )
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS quizzes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      questions TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+      UNIQUE(plan_id, day)
+    )
+  `);
+
   await runMigrations(db);
 }
 
@@ -136,6 +148,12 @@ async function runMigrations(db: Client): Promise<void> {
   }
   if (!pvCols.includes('day_theme')) {
     await db.execute('ALTER TABLE plan_videos ADD COLUMN day_theme TEXT');
+  }
+  if (!pvCols.includes('watched_at')) {
+    await db.execute('ALTER TABLE plan_videos ADD COLUMN watched_at TEXT');
+  }
+  if (!pvCols.includes('ai_summary')) {
+    await db.execute('ALTER TABLE plan_videos ADD COLUMN ai_summary TEXT');
   }
 
   const chInfo = await db.execute('PRAGMA table_info(channels)');

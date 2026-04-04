@@ -51,10 +51,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (watched !== null) {
+    const isWatched = watched === '1';
     await db.execute({
-      sql: `UPDATE plan_videos SET watched = ?
+      sql: `UPDATE plan_videos SET watched = ?, watched_at = ?
             WHERE id = ? AND plan_id IN (SELECT id FROM plans WHERE user_id = ?)`,
-      args: [watched === '1' ? 1 : 0, id, session.user.id],
+      args: [isWatched ? 1 : 0, isWatched ? new Date().toISOString() : null, id, session.user.id],
     });
   }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import PlanDayCard from '@/components/PlanDayCard';
 import MindMapModal from '@/components/MindMapModal';
+import QuizModal from '@/components/QuizModal';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -18,7 +19,9 @@ interface Video {
   channel_name: string;
   level: string;
   watched: number;
+  watched_at?: string;
   notes?: string;
+  ai_summary?: string;
   order_in_day: number;
   day_theme?: string;
 }
@@ -42,6 +45,7 @@ function PlanoContent() {
   const [selectedDay, setSelectedDay] = useState(1);
   const [loading, setLoading] = useState(true);
   const [mindMap, setMindMap] = useState<{ day?: number } | null>(null);
+  const [quiz, setQuiz] = useState<{ day: number } | null>(null);
 
   useEffect(() => {
     if (!planId) {
@@ -87,6 +91,12 @@ function PlanoContent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ notes }),
     });
+  }
+
+  function handleAiSummary(videoId: number, ai_summary: string) {
+    setVideos((prev) =>
+      prev.map((v) => (v.id === videoId ? { ...v, ai_summary } : v))
+    );
   }
 
   if (loading) {
@@ -220,6 +230,21 @@ function PlanoContent() {
           })}
         </div>
 
+        {/* Stats rápidas */}
+        <div className="grid grid-cols-3 gap-3 animate-slide-up">
+          {[
+            { label: 'Progresso geral', value: `${progress}%`, sub: `${totalWatched} de ${videos.length} vídeos` },
+            { label: 'Horas assistidas', value: `${Math.round(videos.filter(v=>v.watched).reduce((s,v)=>s+v.duration_minutes,0)/60*10)/10}h`, sub: `de ${Math.round(videos.reduce((s,v)=>s+v.duration_minutes,0)/60*10)/10}h totais` },
+            { label: 'Dias concluídos', value: `${days.filter(d=>videos.filter(v=>v.day===d).every(v=>v.watched)).length}`, sub: `de ${days.length} dias` },
+          ].map((stat) => (
+            <div key={stat.label} className="bg-zinc-900/60 border border-zinc-800/60 rounded-xl px-4 py-3">
+              <p className="text-xs text-zinc-600 mb-1">{stat.label}</p>
+              <p className="text-lg font-bold bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent leading-none">{stat.value}</p>
+              <p className="text-xs text-zinc-600 mt-0.5">{stat.sub}</p>
+            </div>
+          ))}
+        </div>
+
         {/* Card do dia */}
         {videosOnDay.length > 0 ? (
           <div className="animate-slide-up" style={{ animationDelay: '0.05s' }}>
@@ -229,6 +254,8 @@ function PlanoContent() {
               videos={videosOnDay}
               onToggleWatched={handleToggleWatched}
               onSaveNotes={handleSaveNotes}
+              onAiSummary={handleAiSummary}
+              onQuiz={() => setQuiz({ day: selectedDay })}
             />
           </div>
         ) : (
@@ -244,6 +271,15 @@ function PlanoContent() {
           planTitle={plan.title}
           day={mindMap.day}
           onClose={() => setMindMap(null)}
+        />
+      )}
+
+      {quiz !== null && plan && (
+        <QuizModal
+          planId={plan.id}
+          day={quiz.day}
+          dayTheme={videosOnDay[0]?.day_theme ?? undefined}
+          onClose={() => setQuiz(null)}
         />
       )}
     </main>
