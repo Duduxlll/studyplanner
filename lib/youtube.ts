@@ -148,7 +148,7 @@ async function fetchAllFromPlaylist(playlistId: string): Promise<VideoInfo[]> {
   const allVideoIds: string[] = [];
   let pageToken: string | undefined;
   let pages = 0;
-  const MAX_PAGES = 4; // máx ~200 vídeos/canal — suficiente e muito mais rápido
+  const MAX_PAGES = 2; // ~100 vídeos por canal — rápido e suficiente
 
   do {
     const playlistRes = await youtube.playlistItems.list({
@@ -169,14 +169,13 @@ async function fetchAllFromPlaylist(playlistId: string): Promise<VideoInfo[]> {
 
   if (!allVideoIds.length) return [];
 
-  const allVideos: VideoInfo[] = [];
+  // Busca detalhes de todos os batches em PARALELO (antes era sequencial)
+  const batches: string[][] = [];
   for (let i = 0; i < allVideoIds.length; i += 50) {
-    const batch = allVideoIds.slice(i, i + 50);
-    const details = await fetchVideoDetails(batch);
-    allVideos.push(...details);
+    batches.push(allVideoIds.slice(i, i + 50));
   }
-
-  return allVideos;
+  const results = await Promise.all(batches.map((b) => fetchVideoDetails(b)));
+  return results.flat();
 }
 
 // Mantido para compatibilidade — usa getAllChannelVideos + filtro local
