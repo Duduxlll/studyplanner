@@ -25,14 +25,14 @@ export async function GET() {
   await upsertUser(session.user.id, session.user.email ?? '', session.user.name ?? '');
 
   const userResult = await db.execute({
-    sql: 'SELECT id, email, name, bio, avatar_url, banner_url, theme, email_verified, created_at FROM users WHERE id = ?',
+    sql: 'SELECT id, email, name, bio, avatar_url, banner_url, theme, email_verified, created_at, password_hash FROM users WHERE id = ?',
     args: [session.user.id],
   });
 
   const user = userResult.rows[0] as unknown as {
     id: string; email: string; name: string; bio: string;
     avatar_url: string; banner_url: string; theme: string;
-    email_verified: number; created_at: string;
+    email_verified: number; created_at: string; password_hash: string | null;
   } | undefined;
 
   const statsResult = await db.execute({
@@ -48,12 +48,15 @@ export async function GET() {
     total_plans: number; total_watched: number; total_videos: number; total_channels: number;
   };
 
+  const userSafe = user
+    ? { ...user, password_hash: undefined }
+    : { id: session.user.id, email: session.user.email, name: session.user.name,
+        bio: '', avatar_url: '', banner_url: '', theme: 'dark', email_verified: 1,
+        created_at: new Date().toISOString() };
+
   return NextResponse.json({
-    user: user ?? {
-      id: session.user.id, email: session.user.email, name: session.user.name,
-      bio: '', avatar_url: '', banner_url: '', theme: 'dark', email_verified: 1,
-      created_at: new Date().toISOString(),
-    },
+    user: userSafe,
+    has_password: !!(user?.password_hash),
     stats,
     googleImage: session.user.image ?? null,
   });

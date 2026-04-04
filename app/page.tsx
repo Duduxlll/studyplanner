@@ -163,6 +163,7 @@ export default function Home() {
   const [showPlanCreator, setShowPlanCreator] = useState(false);
   const [deletingPlan, setDeletingPlan] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
 
   async function loadChannels() {
     const res = await fetch('/api/channels');
@@ -184,6 +185,7 @@ export default function Home() {
         .then(d => {
           const url = d.user?.avatar_url || d.googleImage || '';
           if (url) setAvatarUrl(url);
+          setHasPassword(d.has_password ?? true);
           // Atualiza conta salva com nome e avatar reais (captura Google também)
           if (session?.user?.email) {
             upsertSavedAccount({
@@ -328,6 +330,23 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+      {/* Banner: usuário Google sem senha */}
+      {hasPassword === false && (
+        <div className="border-b border-amber-500/20 bg-amber-500/5 px-6 py-3">
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <p className="text-amber-400 text-sm">
+              🔑 Sua conta não tem senha. Defina uma para poder entrar com email e senha no futuro.
+            </p>
+            <Link
+              href="/set-password"
+              className="flex-shrink-0 px-4 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium rounded-xl transition-all"
+            >
+              Definir senha
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-12 relative">
         <section className="animate-slide-up">
