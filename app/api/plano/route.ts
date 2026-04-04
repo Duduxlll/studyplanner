@@ -165,15 +165,27 @@ async function callClaudeOnce(prompt: string): Promise<PlanDay[]> {
   return parsed.days as PlanDay[];
 }
 
+function isTransient(msg: string) {
+  return (
+    msg.includes('indisponível') ||
+    msg.includes('overloaded') ||
+    msg.includes('529') ||
+    msg.includes('502') ||
+    msg.includes('503') ||
+    msg.includes('An error') ||
+    msg.includes('ECONNRESET') ||
+    msg.includes('fetch failed')
+  );
+}
+
 async function callClaude(prompt: string): Promise<PlanDay[]> {
   try {
     return await callClaudeOnce(prompt);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // Retry automático apenas para erros transitórios da API
-    if (msg.includes('indisponível') || msg.includes('overloaded') || msg.includes('529')) {
-      console.warn('[Claude] Erro transitório, tentando novamente em 5s...');
-      await new Promise(r => setTimeout(r, 5000));
+    if (isTransient(msg)) {
+      console.warn('[Claude] Erro transitório, retry em 4s...', msg.slice(0, 120));
+      await new Promise(r => setTimeout(r, 4000));
       return await callClaudeOnce(prompt);
     }
     throw err;
@@ -288,62 +300,52 @@ export async function POST(req: NextRequest) {
     let allDays: PlanDay[] = [];
 
     if (total_days <= 12) {
-      // Chamada única para planos curtos
+      // ── Plano curto: 1 chamada ──────────────────────────────────────────────
       const prompt = buildPrompt(
         toList(videosValidos, videosNeeded(total_days)),
         1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
       );
+      allDays = await callClaude(prompt);
 
-      try {
-        allDays = await callClaude(prompt);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('[Claude] Erro na geração (único):', msg);
-        return NextResponse.json({ error: `Erro ao gerar plano: ${msg}` }, { status: 500 });
-      }
     } else {
-      // Batching em 2 chamadas para planos longos
+      // ── Plano longo: 2 chamadas em PARALELO ─────────────────────────────────
+      // Divide o pool de vídeos em dois grupos já de antemão, sem esperar o lote 1
       const midDay = Math.ceil(total_days / 2);
+      const daysLote2 = total_days - midDay;
 
-      // Lote 1: dias 1 até midDay
+      const metade = Math.ceil(videosValidos.length / 2);
+      const pool1 = videosValidos.slice(0, metade);
+      const pool2 = videosValidos.slice(metade);
+
       const prompt1 = buildPrompt(
-        toList(videosValidos, videosNeeded(midDay)),
+        toList(pool1, videosNeeded(midDay)),
         1, midDay, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
       );
+      const prompt2 = buildPrompt(
+        toList(pool2, videosNeeded(daysLote2)),
+        midDay + 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
+      );
 
-      let days1: PlanDay[];
-      try {
-        days1 = await callClaude(prompt1);
-        console.log(`[Plano] Lote 1 gerado: ${days1.length} dias.`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('[Claude] Erro no lote 1:', msg);
-        return NextResponse.json({ error: `Erro no lote 1: ${msg}` }, { status: 500 });
+      // Dispara os dois ao mesmo tempo — tempo total ≈ tempo de 1 chamada
+      const [result1, result2] = await Promise.allSettled([
+        callClaude(prompt1),
+        callClaude(prompt2),
+      ]);
+
+      if (result1.status === 'rejected') {
+        const msg = result1.reason instanceof Error ? result1.reason.message : String(result1.reason);
+        console.error('[Claude] Lote 1 falhou:', msg);
+        throw new Error(msg);   // deixa o catch externo formatar a resposta
       }
 
-      // Filtra vídeos usados no lote 1
-      const usedInBatch1 = new Set<string>(days1.flatMap((d) => d.videos.map((v) => v.url)));
-      const videosParaLote2 = videosValidos.filter((v) => !usedInBatch1.has(v.url));
-
-      let days2: PlanDay[] = [];
-      if (videosParaLote2.length > 0) {
-        const daysLote2 = total_days - midDay;
-        const prompt2 = buildPrompt(
-          toList(videosParaLote2, videosNeeded(daysLote2)),
-          midDay + 1, total_days, total_days, hours_per_day, topics, instructions, minPorDia, maxPorDia
-        );
-
-        try {
-          days2 = await callClaude(prompt2);
-          console.log(`[Plano] Lote 2 gerado: ${days2.length} dias.`);
-        } catch (err) {
-          console.error('[Claude] Erro no lote 2 (usando apenas lote 1):', err instanceof Error ? err.message : String(err));
-        }
-      } else {
-        console.log('[Plano] Sem vídeos suficientes para lote 2.');
+      const days1 = result1.value;
+      const days2 = result2.status === 'fulfilled' ? result2.value : [];
+      if (result2.status === 'rejected') {
+        console.error('[Claude] Lote 2 falhou (plano parcial):', result2.reason);
       }
 
       allDays = [...days1, ...days2];
+      console.log(`[Plano] Gerado em paralelo: ${days1.length} + ${days2.length} dias.`);
     }
 
     // Salva o plano
@@ -379,9 +381,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ planId, totalDays: allDays.length }, { status: 201 });
 
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[Plano] Erro geral:', message);
-    return NextResponse.json({ error: `Erro ao gerar plano: ${message}` }, { status: 500 });
+    const raw = err instanceof Error ? err.message : String(err);
+    console.error('[Plano] Erro geral:', raw);
+
+    // Transforma erros técnicos em mensagens amigáveis
+    let friendly = 'Não foi possível gerar o plano. Tente novamente em alguns segundos.';
+    if (raw.includes('credit') || raw.includes('billing') || raw.includes('balance')) {
+      friendly = 'Créditos da API esgotados. Entre em contato com o suporte.';
+    } else if (raw.includes('timeout') || raw.includes('TIMEOUT') || raw.includes('timed out')) {
+      friendly = 'A geração demorou demais. Tente um plano com menos dias ou menos horas/dia.';
+    } else if (raw.includes('quota') || raw.includes('rate') || raw.includes('429')) {
+      friendly = 'Muitas requisições simultâneas. Aguarde alguns segundos e tente novamente.';
+    } else if (raw.includes('truncada') || raw.includes('max_tokens')) {
+      friendly = 'Plano muito grande para gerar de uma vez. Tente reduzir os dias ou as horas/dia.';
+    } else if (raw.includes('indisponível') || raw.includes('overloaded') || raw.includes('529')) {
+      friendly = 'Serviço de IA temporariamente sobrecarregado. Tente novamente em instantes.';
+    }
+
+    return NextResponse.json({ error: friendly }, { status: 500 });
   }
 }
 
