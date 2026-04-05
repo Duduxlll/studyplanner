@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { ensureInit } from '@/lib/db';
 import { sendVerificationCode } from '@/lib/email';
+import { rateLimitCheck, getIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +11,9 @@ function generateCode() {
 }
 
 export async function POST(req: NextRequest) {
+  const rl = rateLimitCheck(`register:${getIp(req)}`, 5, 15 * 60 * 1000);
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter);
+
   try {
     const { name, email, password } = await req.json() as {
       name: string;

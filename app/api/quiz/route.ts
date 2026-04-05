@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { ensureInit } from '@/lib/db';
 import Anthropic from '@anthropic-ai/sdk';
+import { rateLimitCheck, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
+    const rl = rateLimitCheck(`quiz:${session.user.id}`, 20, 60 * 60 * 1000);
+    if (!rl.ok) return rateLimitResponse(rl.retryAfter);
 
     const { planId, day } = await req.json() as { planId: number; day: number };
     if (!planId || !day) return NextResponse.json({ error: 'planId e day obrigatórios' }, { status: 400 });

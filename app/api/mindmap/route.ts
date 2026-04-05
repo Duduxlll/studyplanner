@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { ensureInit } from '@/lib/db';
 import Anthropic from '@anthropic-ai/sdk';
+import { rateLimitCheck, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -11,6 +12,9 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+
+  const rl = rateLimitCheck(`mindmap:${session.user.id}`, 10, 60 * 60 * 1000);
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter);
 
   const { planId, day } = await req.json() as { planId: number; day?: number };
 

@@ -4,6 +4,7 @@ import { ensureInit } from '@/lib/db';
 import { auth } from '@/auth';
 import { filterVideosByTopics, VideoInfo } from '@/lib/youtube';
 import { getVideosWithCache } from '@/lib/video-cache';
+import { rateLimitCheck, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -172,6 +173,9 @@ export async function POST(req: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
     const userId = session.user.id;
+
+    const rl = rateLimitCheck(`plano:${userId}`, 5, 60 * 60 * 1000);
+    if (!rl.ok) return rateLimitResponse(rl.retryAfter);
 
     const body = await req.json();
     const { topics, hours_per_day, total_days, instructions } = body as {

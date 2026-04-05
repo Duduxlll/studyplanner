@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ensureInit } from '@/lib/db';
+import { rateLimitCheck, getIp, rateLimitResponse } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
+  // Limita tentativas de código por IP — brute force protection
+  const rl = rateLimitCheck(`verify-code:${getIp(req)}`, 10, 15 * 60 * 1000);
+  if (!rl.ok) return rateLimitResponse(rl.retryAfter);
+
   try {
     const { email, code, type } = await req.json() as {
       email: string;
