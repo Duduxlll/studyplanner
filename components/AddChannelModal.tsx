@@ -2,9 +2,18 @@
 
 import { useState } from 'react';
 
+interface NewChannel {
+  id: number;
+  name: string;
+  channel_id: string;
+  thumbnail: string;
+  description: string;
+  is_playlist: number;
+}
+
 interface Props {
   onClose: () => void;
-  onAdded: () => void;
+  onAdded: (channel: NewChannel) => void;
 }
 
 function isPlaylistUrl(input: string): boolean {
@@ -57,7 +66,14 @@ export default function AddChannelModal({ onClose, onAdded }: Props) {
       const saveData = await saveRes.json();
       if (!saveRes.ok) throw new Error(saveData.error ?? 'Erro ao salvar');
 
-      onAdded();
+      onAdded({
+        id: saveData.id,
+        name,
+        channel_id: sourceId,
+        thumbnail,
+        description: description ?? '',
+        is_playlist: isPlaylist ? 1 : 0,
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao adicionar');

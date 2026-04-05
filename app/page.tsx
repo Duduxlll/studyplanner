@@ -162,20 +162,9 @@ export default function Home() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPlanCreator, setShowPlanCreator] = useState(false);
-  const [deletingPlan, setDeletingPlan] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [loadingData, setLoadingData] = useState(true);
-
-  async function loadChannels() {
-    const res = await fetch('/api/channels');
-    setChannels(await res.json());
-  }
-
-  async function loadPlans() {
-    const res = await fetch('/api/plano');
-    setPlans(await res.json());
-  }
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -202,24 +191,23 @@ export default function Home() {
     }
   }, [status]);
 
-  async function handleDeleteChannel(id: number) {
-    await fetch(`/api/channels?id=${id}`, { method: 'DELETE' });
-    loadChannels();
+  function handleDeleteChannel(id: number) {
+    // Optimistic: remove da UI imediatamente, DELETE vai em background
+    setChannels(prev => prev.filter(ch => ch.id !== id));
+    fetch(`/api/channels?id=${id}`, { method: 'DELETE' });
   }
 
-  async function handleResetAll() {
+  function handleResetAll() {
     if (!confirm('Apagar TODOS os planos e histórico de vídeos usados? Os canais serão mantidos.')) return;
+    setPlans([]);
     setResetting(true);
-    await fetch('/api/reset', { method: 'DELETE' });
-    await loadPlans();
-    setResetting(false);
+    fetch('/api/reset', { method: 'DELETE' }).finally(() => setResetting(false));
   }
 
-  async function handleDeletePlan(id: number) {
-    setDeletingPlan(id);
-    await fetch(`/api/plano?id=${id}`, { method: 'DELETE' });
-    await loadPlans();
-    setDeletingPlan(null);
+  function handleDeletePlan(id: number) {
+    // Optimistic: remove da UI imediatamente, DELETE vai em background
+    setPlans(prev => prev.filter(p => p.id !== id));
+    fetch(`/api/plano?id=${id}`, { method: 'DELETE' });
   }
 
   if (status === 'loading') return null;
@@ -492,16 +480,11 @@ export default function Home() {
 
                     <button
                       onClick={() => handleDeletePlan(plan.id)}
-                      disabled={deletingPlan === plan.id}
-                      className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-zinc-700 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-colors disabled:opacity-50"
+                      className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-zinc-700 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-colors"
                     >
-                      {deletingPlan === plan.id ? (
-                        <span className="w-3 h-3 border-2 border-zinc-600 border-t-red-400 rounded-full animate-spin" />
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      )}
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </button>
                   </div>
                 );
@@ -521,7 +504,7 @@ export default function Home() {
         )}
       </div>
 
-      {showAddModal && <AddChannelModal onClose={() => setShowAddModal(false)} onAdded={loadChannels} />}
+      {showAddModal && <AddChannelModal onClose={() => setShowAddModal(false)} onAdded={(ch) => setChannels(prev => [ch, ...prev])} />}
       {showPlanCreator && <PlanCreator onClose={() => setShowPlanCreator(false)} />}
     </main>
   );
