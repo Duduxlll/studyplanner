@@ -7,13 +7,13 @@ const CSP = [
   // Tailwind e Next.js injetam estilos inline
   "style-src 'self' 'unsafe-inline'",
   // Imagens: próprio servidor + YouTube/Google (thumbnails e avatars)
-  "img-src 'self' data: blob: https://i.ytimg.com https://yt3.googleusercontent.com https://yt3.ggpht.com https://lh3.googleusercontent.com",
+  "img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com https://yt3.googleusercontent.com https://yt3.ggpht.com https://lh3.googleusercontent.com",
   // Fontes: Geist é servida localmente pelo Next.js
   "font-src 'self'",
   // Conexões: apenas próprio servidor
   "connect-src 'self'",
-  // Sem frames embutidos
-  "frame-src 'none'",
+  // Permite embeds do YouTube
+  "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
   // Ninguém pode embutir este site em iframe
   "frame-ancestors 'none'",
   // Sem plugins (Flash etc.)
@@ -37,8 +37,7 @@ const securityHeaders = [
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
   // Impede que janelas de outra origem acessem window deste site
   { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-  // credentialless: permite imagens externas sem CORP header, mas sem credenciais
-  { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
+  // COEP removido: YouTube embeds não enviam headers COEP e seriam bloqueados
   // Política de conteúdo completa
   { key: 'Content-Security-Policy', value: CSP },
 ];
