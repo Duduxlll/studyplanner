@@ -458,6 +458,7 @@ export default function Home() {
                     key={plan.id}
                     className="flex items-center gap-3 bg-zinc-900/50 backdrop-blur-sm border border-zinc-700/40 hover:border-violet-500/40 rounded-2xl px-5 py-4 transition-all duration-300 group hover:bg-zinc-900/70 hover:shadow-[0_0_30px_rgba(139,92,246,0.07)] animate-slide-up"
                     style={{ animationDelay: `${0.05 * i}s` }}
+                    onMouseEnter={() => fetch(`/api/plano/detail?planId=${plan.id}`)}
                   >
                     <Link href={`/plano?id=${plan.id}`} className="flex-1 flex items-center justify-between min-w-0">
                       <div className="min-w-0">
