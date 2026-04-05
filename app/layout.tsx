@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AvatarProvider } from "@/components/AvatarProvider";
+import { DataProvider } from "@/components/DataProvider";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SessionProvider>
           <ThemeProvider>
             <AvatarProvider>
-              {children}
+              <DataProvider>
+                {children}
+              </DataProvider>
             </AvatarProvider>
           </ThemeProvider>
         </SessionProvider>

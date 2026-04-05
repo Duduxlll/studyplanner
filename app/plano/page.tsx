@@ -202,6 +202,7 @@ function PlanoContent() {
             <Link
               href="/"
               className="text-zinc-600 hover:text-zinc-400 transition-colors text-sm flex-shrink-0 flex items-center gap-1 group"
+              onMouseEnter={() => fetch('/api/home')}
             >
               <span className="group-hover:-translate-x-0.5 transition-transform inline-block">←</span> Início
             </Link>

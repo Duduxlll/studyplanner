@@ -8,25 +8,8 @@ import PlanCreator from '@/components/PlanCreator';
 import Link from 'next/link';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAvatar } from '@/components/AvatarProvider';
-import { upsertSavedAccount } from '@/lib/saved-accounts';
+import { useData, type Channel } from '@/components/DataProvider';
 import { Sk } from '@/components/Skeleton';
-
-interface Channel {
-  id: number;
-  name: string;
-  channel_id: string;
-  thumbnail: string;
-  description: string;
-}
-
-interface Plan {
-  id: number;
-  title: string;
-  topics: string;
-  hours_per_day: number;
-  total_days: number;
-  created_at: string;
-}
 
 /* ─── Landing page (não logado) ─── */
 function LandingPage() {
@@ -157,39 +140,21 @@ function LandingPage() {
 export default function Home() {
   const { data: session, status } = useSession();
   const { theme, toggle } = useTheme();
-  const { avatarUrl, setAvatarUrl } = useAvatar();
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const { avatarUrl } = useAvatar();
+  const { channels, plans, hasPassword, loading: loadingData, lastLoadedAt, setChannels, setPlans } = useData();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPlanCreator, setShowPlanCreator] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
-  const [loadingData, setLoadingData] = useState(true);
 
+  // Refresh silencioso ao voltar para a home (sem mostrar loading)
   useEffect(() => {
-    if (status === 'authenticated') {
-      setLoadingData(true);
-      Promise.all([
-        fetch('/api/home').then(r => r.json()),
-        fetch('/api/profile').then(r => r.json()),
-      ]).then(([home, profile]) => {
-        if (Array.isArray(home.channels)) setChannels(home.channels);
-        if (Array.isArray(home.plans)) setPlans(home.plans);
-
-        const url = profile.user?.avatar_url || profile.googleImage || '';
-        if (url) setAvatarUrl(url);
-        setHasPassword(profile.has_password ?? true);
-        if (session?.user?.email) {
-          upsertSavedAccount({
-            email: session.user.email,
-            name: profile.user?.name || session.user.name || '',
-            avatarUrl: url,
-            provider: session.user.image && !profile.user?.avatar_url ? 'google' : 'credentials',
-          });
-        }
-      }).catch(() => {}).finally(() => setLoadingData(false));
-    }
-  }, [status]);
+    if (status !== 'authenticated') return;
+    if (Date.now() - lastLoadedAt < 5000) return; // evita double-fetch no primeiro load
+    fetch('/api/home').then(r => r.json()).then(home => {
+      if (Array.isArray(home.channels)) setChannels(home.channels);
+      if (Array.isArray(home.plans)) setPlans(home.plans);
+    }).catch(() => {});
+  }, []);
 
   function handleDeleteChannel(id: number) {
     // Optimistic: remove da UI imediatamente, DELETE vai em background
@@ -304,7 +269,7 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Link href="/progresso" className="px-3 py-2 text-zinc-500 hover:text-zinc-300 text-sm rounded-lg hover:bg-white/[0.05] transition-all flex items-center gap-1.5 group border border-transparent hover:border-white/[0.08]">
+            <Link href="/progresso" onMouseEnter={() => fetch('/api/stats')} className="px-3 py-2 text-zinc-500 hover:text-zinc-300 text-sm rounded-lg hover:bg-white/[0.05] transition-all flex items-center gap-1.5 group border border-transparent hover:border-white/[0.08]">
               <svg className="w-4 h-4 group-hover:text-violet-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
