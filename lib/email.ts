@@ -1,9 +1,13 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const FROM = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
-
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY ?? 'missing');
+function getTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
 }
 
 export async function sendVerificationCode(
@@ -22,8 +26,8 @@ export async function sendVerificationCode(
       ? 'Use o código abaixo para confirmar seu cadastro.'
       : 'Use o código abaixo para criar uma nova senha.';
 
-  await getResend().emails.send({
-    from: `StudyPlanner <${FROM}>`,
+  await getTransporter().sendMail({
+    from: `StudyPlanner <${process.env.GMAIL_USER}>`,
     to: email,
     subject,
     html: `
