@@ -29,7 +29,7 @@ export async function sendVerificationCode(
       : 'Use o código abaixo para criar uma nova senha.';
 
   await getTransporter().sendMail({
-    from: `StudyPlanner <${process.env.BREVO_SMTP_USER}>`,
+    from: `StudyPlanner <${process.env.BREVO_FROM_EMAIL ?? process.env.BREVO_SMTP_USER}>`,
     to: email,
     subject,
     html: `
