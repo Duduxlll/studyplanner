@@ -2,10 +2,12 @@ import nodemailer from 'nodemailer';
 
 function getTransporter() {
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: process.env.BREVO_SMTP_USER,
+      pass: process.env.BREVO_SMTP_PASS,
     },
   });
 }
@@ -27,7 +29,7 @@ export async function sendVerificationCode(
       : 'Use o código abaixo para criar uma nova senha.';
 
   await getTransporter().sendMail({
-    from: `StudyPlanner <${process.env.GMAIL_USER}>`,
+    from: `StudyPlanner <${process.env.BREVO_SMTP_USER}>`,
     to: email,
     subject,
     html: `
