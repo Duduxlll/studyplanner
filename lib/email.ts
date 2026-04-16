@@ -1,4 +1,4 @@
-const FROM_EMAIL = process.env.BREVO_FROM_EMAIL ?? 'estudos.vitoreduar05@gmail.com';
+const FROM_EMAIL = process.env.BREVO_FROM_EMAIL ?? 'studyplanner.noreply@outlook.com';
 
 export async function sendVerificationCode(
   email: string,
