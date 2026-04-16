@@ -45,8 +45,10 @@ export async function sendVerificationCode(
     }),
   });
 
+  const responseText = await res.text();
+  console.log(`[Email] Brevo status=${res.status} to=${email} body=${responseText}`);
+
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Brevo API error ${res.status}: ${err}`);
+    throw new Error(`Brevo API error ${res.status}: ${responseText}`);
   }
 }
