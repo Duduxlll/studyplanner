@@ -2,14 +2,13 @@ import nodemailer from 'nodemailer';
 
 function getTransporter() {
   return nodemailer.createTransport({
-    host: 'smtp-mail.outlook.com',
+    host: 'smtp.zoho.com',
     port: 587,
     secure: false,
     auth: {
-      user: process.env.OUTLOOK_USER,
-      pass: process.env.OUTLOOK_PASS,
+      user: process.env.ZOHO_USER,
+      pass: process.env.ZOHO_PASS,
     },
-    tls: { ciphers: 'SSLv3' },
   });
 }
 
@@ -30,7 +29,7 @@ export async function sendVerificationCode(
       : 'Use o código abaixo para criar uma nova senha.';
 
   await getTransporter().sendMail({
-    from: `StudyPlanner <${process.env.OUTLOOK_USER}>`,
+    from: `StudyPlanner <${process.env.ZOHO_USER}>`,
     to: email,
     subject,
     html: `

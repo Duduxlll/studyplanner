@@ -36,7 +36,7 @@ export default function RegisterPage() {
       return;
     }
 
-    router.push(`/verify?email=${encodeURIComponent(email)}&type=register`);
+    router.push('/login?registered=1');
   }
 
   return (

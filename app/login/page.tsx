@@ -292,10 +292,7 @@ function LoginForm() {
                   ) : 'Entrar'}
                 </button>
 
-                <div className="flex items-center justify-between pt-1">
-                  <Link href="/forgot-password" className="text-xs text-zinc-500 hover:text-violet-400 transition-colors">
-                    Esqueci a senha
-                  </Link>
+                <div className="flex items-center justify-end pt-1">
                   <Link href="/register" className="text-xs text-violet-400 hover:text-violet-300 transition-colors">
                     Criar conta
                   </Link>
