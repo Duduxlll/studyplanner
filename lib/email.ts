@@ -1,16 +1,4 @@
-import nodemailer from 'nodemailer';
-
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp-relay.brevo.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.BREVO_SMTP_USER,
-      pass: process.env.BREVO_SMTP_PASS,
-    },
-  });
-}
+const FROM_EMAIL = process.env.BREVO_FROM_EMAIL ?? 'estudos.vitoreduar05@gmail.com';
 
 export async function sendVerificationCode(
   email: string,
@@ -28,24 +16,37 @@ export async function sendVerificationCode(
       ? 'Use o código abaixo para confirmar seu cadastro.'
       : 'Use o código abaixo para criar uma nova senha.';
 
-  await getTransporter().sendMail({
-    from: `StudyPlanner <${process.env.BREVO_FROM_EMAIL ?? process.env.BREVO_SMTP_USER}>`,
-    to: email,
-    subject,
-    html: `
-      <div style="font-family:sans-serif;max-width:440px;margin:0 auto;padding:40px 24px;background:#18181b;color:#fff;border-radius:16px;">
-        <div style="text-align:center;margin-bottom:24px;">
-          <div style="display:inline-flex;width:56px;height:56px;background:linear-gradient(135deg,#7c3aed,#6d28d9);border-radius:14px;align-items:center;justify-content:center;font-size:28px;">📚</div>
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'api-key': process.env.BREVO_API_KEY ?? '',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: 'StudyPlanner', email: FROM_EMAIL },
+      to: [{ email }],
+      subject,
+      htmlContent: `
+        <div style="font-family:sans-serif;max-width:440px;margin:0 auto;padding:40px 24px;background:#18181b;color:#fff;border-radius:16px;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <div style="display:inline-flex;width:56px;height:56px;background:linear-gradient(135deg,#7c3aed,#6d28d9);border-radius:14px;align-items:center;justify-content:center;font-size:28px;">📚</div>
+          </div>
+          <h2 style="color:#a78bfa;margin:0 0 8px;font-size:22px;text-align:center;">${heading}</h2>
+          <p style="color:#a1a1aa;font-size:14px;text-align:center;margin:0 0 32px;">${body}</p>
+          <div style="background:#27272a;border:1px solid #3f3f46;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+            <p style="color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:2px;margin:0 0 12px;">Código</p>
+            <p style="color:#fff;font-size:36px;font-weight:700;letter-spacing:10px;margin:0;">${code}</p>
+            <p style="color:#52525b;font-size:12px;margin:12px 0 0;">Válido por 15 minutos</p>
+          </div>
+          <p style="color:#52525b;font-size:12px;text-align:center;margin:0;">Se você não solicitou isso, ignore este email.</p>
         </div>
-        <h2 style="color:#a78bfa;margin:0 0 8px;font-size:22px;text-align:center;">${heading}</h2>
-        <p style="color:#a1a1aa;font-size:14px;text-align:center;margin:0 0 32px;">${body}</p>
-        <div style="background:#27272a;border:1px solid #3f3f46;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
-          <p style="color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:2px;margin:0 0 12px;">Código</p>
-          <p style="color:#fff;font-size:36px;font-weight:700;letter-spacing:10px;margin:0;">${code}</p>
-          <p style="color:#52525b;font-size:12px;margin:12px 0 0;">Válido por 15 minutos</p>
-        </div>
-        <p style="color:#52525b;font-size:12px;text-align:center;margin:0;">Se você não solicitou isso, ignore este email.</p>
-      </div>
-    `,
+      `,
+    }),
   });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brevo API error ${res.status}: ${err}`);
+  }
 }
